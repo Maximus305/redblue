@@ -67,7 +67,7 @@ export default function AgentPage({ params }: AgentPageProps) {
       const settingsSnap = await getDoc(settingsRef);
 
       if (!settingsSnap.exists()) {
-        setError('System not initialized. Contact administrator.');
+        setError('System not initialized, Contact administrator.');
         return;
       }
 
