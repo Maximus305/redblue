@@ -2,7 +2,7 @@
 import React, { useState, useEffect, use } from 'react';
 import { Shield, Key, Loader2, Crown } from 'lucide-react';
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 
 interface AgentPageProps {
@@ -27,6 +27,25 @@ export default function AgentPage({ params }: AgentPageProps) {
     fetchAgentData();
     setTimeout(() => setShowContent(true), 100);
   }, [agentSlug]);
+
+  const createNewAgent = async () => {
+    try {
+      const agentRef = doc(db, "agents", agentSlug);
+      const newAgentId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const newCodeWord = Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      await setDoc(agentRef, {
+        agentId: newAgentId,
+        codeWord: newCodeWord,
+        createdAt: new Date(),
+      });
+      
+      return { agentId: newAgentId, codeWord: newCodeWord };
+    } catch (error) {
+      console.error('Error creating new agent:', error);
+      throw new Error('Failed to create new agent');
+    }
+  };
 
   const checkSpymasterStatus = async () => {
     try {
@@ -62,13 +81,15 @@ export default function AgentPage({ params }: AgentPageProps) {
 
       if (agentSnap.exists()) {
         const data = agentSnap.data();
-        if (isSpymaster) {
-          setAgentId(data.agentId);
-          setCodeWord(data.codeWord);
-        } else if (data.agentId && data.codeWord) {
+        if (isSpymaster || (data.agentId && data.codeWord)) {
           setAgentId(data.agentId);
           setCodeWord(data.codeWord);
         }
+      } else {
+        // Create new agent if it doesn't exist
+        const newAgent = await createNewAgent();
+        setAgentId(newAgent.agentId);
+        setCodeWord(newAgent.codeWord);
       }
     } catch (error) {
       console.error('Error fetching agent data:', error);
@@ -82,30 +103,30 @@ export default function AgentPage({ params }: AgentPageProps) {
       setError(null);
       
       const isSpymaster = await checkSpymasterStatus();
-      const settingsRef = doc(db, "settings", "mainSettings");
-      const settingsSnap = await getDoc(settingsRef);
-      
-      if (!settingsSnap.exists()) {
-        setError('System not initialized. Contact administrator.');
-        return;
-      }
-
-      const agentRef = doc(db, "agents", agentSlug);
-      const agentSnap = await getDoc(agentRef);
-
-      if (agentSnap.exists()) {
-        const data = agentSnap.data();
-        if (isSpymaster) {
-          setAgentId(data.agentId);
-          setCodeWord(data.codeWord);
-        } else if (data.agentId && data.codeWord) {
-          setAgentId(data.agentId);
-          setCodeWord(data.codeWord);
-        } else {
-          setError('Access denied. Invalid credentials.');
+      if (!isSpymaster) {
+        const settingsRef = doc(db, "settings", "mainSettings");
+        const settingsSnap = await getDoc(settingsRef);
+        
+        if (!settingsSnap.exists()) {
+          setError('System not initialized. Contact administrator.');
+          return;
         }
-      } else {
-        setError('Access denied. Agent not found.');
+
+        const agentRef = doc(db, "agents", agentSlug);
+        const agentSnap = await getDoc(agentRef);
+
+        if (agentSnap.exists()) {
+          const data = agentSnap.data();
+          if (data.agentId && data.codeWord) {
+            setAgentId(data.agentId);
+            setCodeWord(data.codeWord);
+          }
+        } else {
+          // Create new agent if it doesn't exist
+          const newAgent = await createNewAgent();
+          setAgentId(newAgent.agentId);
+          setCodeWord(newAgent.codeWord);
+        }
       }
     } catch (error) {
       console.error('Error getting code word:', error);
@@ -115,6 +136,7 @@ export default function AgentPage({ params }: AgentPageProps) {
     }
   };
 
+  // Rest of the component remains the same
   const getBgClasses = () => {
     if (teamColor === 'red') return "bg-red-50";
     if (teamColor === 'blue') return "bg-blue-50";
