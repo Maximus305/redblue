@@ -82,25 +82,30 @@ export default function AgentPage({ params }: AgentPageProps) {
       setError(null);
       
       const isSpymaster = await checkSpymasterStatus();
-      if (!isSpymaster) {
-        const settingsRef = doc(db, "settings", "mainSettings");
-        const settingsSnap = await getDoc(settingsRef);
-        
-        if (!settingsSnap.exists()) {
-          setError('System not initialized. Contact administrator.');
-          return;
-        }
+      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsSnap = await getDoc(settingsRef);
+      
+      if (!settingsSnap.exists()) {
+        setError('System not initialized. Contact administrator.');
+        return;
+      }
 
-        const agentRef = doc(db, "agents", agentSlug);
-        const agentSnap = await getDoc(agentRef);
+      const agentRef = doc(db, "agents", agentSlug);
+      const agentSnap = await getDoc(agentRef);
 
-        if (agentSnap.exists()) {
-          const data = agentSnap.data();
-          if (data.agentId && data.codeWord) {
-            setAgentId(data.agentId);
-            setCodeWord(data.codeWord);
-          }
+      if (agentSnap.exists()) {
+        const data = agentSnap.data();
+        if (isSpymaster) {
+          setAgentId(data.agentId);
+          setCodeWord(data.codeWord);
+        } else if (data.agentId && data.codeWord) {
+          setAgentId(data.agentId);
+          setCodeWord(data.codeWord);
+        } else {
+          setError('Access denied. Invalid credentials.');
         }
+      } else {
+        setError('Access denied. Agent not found.');
       }
     } catch (error) {
       console.error('Error getting code word:', error);
