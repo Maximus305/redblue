@@ -10,8 +10,6 @@ import {
   collection,
   getDocs,
   doc,
-  getDoc,
-  updateDoc,
   setDoc,
   writeBatch
 } from "firebase/firestore";
@@ -47,40 +45,73 @@ export default function AdminDashboard() {
   };
 
   const handleShuffle = async () => {
-    if (!window.confirm('Confirm icon redistribution? This action will reassign all agent codes.')) return;
+    if (!window.confirm('Confirm icon redistribution? This action will reassign all agent codes and spymasters.')) return;
     try {
       setLoading(true);
       const { evenCodeIcon, oddCodeIcon } = getRandomIcons();
       const settingsRef = doc(db, "settings", "mainSettings");
-      const settingsSnap = await getDoc(settingsRef);
       
-      if (!settingsSnap.exists()) {
-        await setDoc(settingsRef, {
-          nextAgentNumber: 1,
-          evenCodeWord: evenCodeIcon,
-          oddCodeWord: oddCodeIcon
-        });
-      } else {
-        await updateDoc(settingsRef, {
-          evenCodeWord: evenCodeIcon,
-          oddCodeWord: oddCodeIcon
-        });
-      }
-
+      // Get all agents
       const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agents = agentsSnapshot.docs.map(doc => ({
+        docRef: doc.ref,
+        id: doc.id
+      }));
+
+      // First select spymasters randomly
+      const availableAgents = [...agents];
+      const randomRedSpymaster = availableAgents.splice(Math.floor(Math.random() * availableAgents.length), 1)[0];
+      const randomBlueSpymaster = availableAgents.splice(Math.floor(Math.random() * availableAgents.length), 1)[0];
+
+      // Update settings with new spymasters and code words
+      await setDoc(settingsRef, {
+        evenCodeWord: evenCodeIcon,
+        oddCodeWord: oddCodeIcon,
+        redSpymaster: randomRedSpymaster.id,
+        blueSpymaster: randomBlueSpymaster.id,
+        nextAgentNumber: 1
+      }, { merge: true });
+
       const batch = writeBatch(db);
       
-      agentsSnapshot.docs.forEach(agentDoc => {
-        const agentData = agentDoc.data();
-        const agentIdNum = parseInt(agentData.agentId, 10);
-        const newWord = agentIdNum % 2 === 0 ? evenCodeIcon : oddCodeIcon;
-        batch.update(doc(db, "agents", agentDoc.id), { codeWord: newWord });
+      // Reset all agents first
+      agents.forEach(agent => {
+        batch.update(agent.docRef, { codeWord: null, agentId: null });
       });
 
-      if (agentsSnapshot.docs.length > 0) {
-        await batch.commit();
+      // Set spymasters
+      batch.update(randomRedSpymaster.docRef, { 
+        agentId: "01", 
+        codeWord: oddCodeIcon 
+      });
+      batch.update(randomBlueSpymaster.docRef, { 
+        agentId: "02", 
+        codeWord: evenCodeIcon 
+      });
+
+      // Distribute remaining agents
+      const remainingAgents = availableAgents;
+      let isBlueTeam = true;
+      let currentAgentNumber = 3;
+
+      while (remainingAgents.length > 0) {
+        const randomIndex = Math.floor(Math.random() * remainingAgents.length);
+        const agent = remainingAgents[randomIndex];
+        
+        const formattedAgentId = currentAgentNumber < 10 ? `0${currentAgentNumber}` : `${currentAgentNumber}`;
+        const codeWord = isBlueTeam ? evenCodeIcon : oddCodeIcon;
+        
+        batch.update(agent.docRef, { 
+          agentId: formattedAgentId,
+          codeWord 
+        });
+        
+        remainingAgents.splice(randomIndex, 1);
+        isBlueTeam = !isBlueTeam;
+        currentAgentNumber++;
       }
-      
+
+      await batch.commit();
       await fetchAdminData();
     } catch (error) {
       console.error('Error shuffling icons:', error);
@@ -110,7 +141,9 @@ export default function AdminDashboard() {
       await setDoc(settingsRef, {
         nextAgentNumber: 1,
         evenCodeWord: evenCodeIcon,
-        oddCodeWord: oddCodeIcon
+        oddCodeWord: oddCodeIcon,
+        redSpymaster: null,
+        blueSpymaster: null
       });
 
       await fetchAdminData();
