@@ -171,16 +171,16 @@ export default function AgentPage({ params }: AgentPageProps) {
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_ID</div>
                   <div className={`text-6xl font-mono ${getTextColorClass()} border border-gray-200 p-6 relative group ${isSpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} rounded`}>
-                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-100 transition-opacity rounded`} />
+                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded`} />
                     <span className="relative">{agentId}</span>
                   </div>
                 </div>
 
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>CODE</div>
-                  <div className={`${isSpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} border border-gray-200 p-6 relative group flex items-center justify-center rounded`}>
-                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-100 transition-opacity rounded`} />
-                    <IconForWord word={codeWord} size={64} className={getTextColorClass()} />
+                  <div className={`${isSpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} border border-gray-200 p-8 relative group flex items-center justify-center rounded min-h-[200px]`}>
+                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded`} />
+                    <IconForWord word={codeWord} size={96} className={getTextColorClass()} />
                   </div>
                 </div>
               </div>
