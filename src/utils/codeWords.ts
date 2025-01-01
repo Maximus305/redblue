@@ -18,7 +18,6 @@ export const IMAGE_MAPPINGS: ImageMappingType = {
   'Hammer': '/images/hammer.png',
   'Lantern': '/images/lantern.png',
   'Lock': '/images/lock.png',
-  'Pyramid': '/images/pyramid.png',
   'Ring': '/images/ring.png',
   'Rocket': '/images/rocket.png'
 };
@@ -39,13 +38,13 @@ interface IconForWordProps {
   className?: string;
 }
 
-export function IconForWord({ word, size = 24, className = "" }: IconForWordProps): ReactElement | null {
+export function IconForWord({ word, size = 200, className = "" }: IconForWordProps): ReactElement | null {
   if (!word || !IMAGE_MAPPINGS[word]) return null;
   
   return createElement('img', {
     src: IMAGE_MAPPINGS[word],
     alt: word,
-    className: `inline-block ${className}`,
-    style: { width: size, height: size }
+    className: `w-full h-full object-contain ${className}`,
+    style: { maxWidth: size, maxHeight: size }
   });
 }

@@ -1,9 +1,14 @@
 "use client"
 import React, { useState, useEffect, use } from 'react';
-import { Shield, Key, Loader2, Crown } from 'lucide-react';
+import { Shield, Key, Loader2, Crown, AlertCircle } from 'lucide-react';
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+} from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AgentPageProps {
   params: Promise<{
@@ -11,85 +16,55 @@ interface AgentPageProps {
   }>;
 }
 
+interface SettingsData {
+  redSpymaster: string;
+  blueSpymaster: string;
+  evenCodeWord: string;
+  oddCodeWord: string;
+}
+
 export default function AgentPage({ params }: AgentPageProps) {
   const resolvedParams = use(params);
   const { agentSlug } = resolvedParams;
   
+  // State declarations
   const [agentId, setAgentId] = useState<string | null>(null);
   const [codeWord, setCodeWord] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showContent, setShowContent] = useState(false);
-  const [isSpymasterState, setIsSpymasterState] = useState(false);
-  const [teamColor, setTeamColor] = useState<'red' | 'blue' | null>(null);
+  const [isSpymaster, setIsSpymaster] = useState<{
+    isRed: boolean;
+    isBlue: boolean;
+  }>({ isRed: false, isBlue: false });
 
   useEffect(() => {
     fetchAgentData();
     setTimeout(() => setShowContent(true), 100);
   }, [agentSlug]);
 
-  const createNewAgent = async () => {
+  const fetchAgentData = async () => {
     try {
-      const agentRef = doc(db, "agents", agentSlug);
-      const newAgentId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const newCodeWord = Math.random().toString(36).substring(2, 8).toUpperCase();
-      
-      await setDoc(agentRef, {
-        agentId: newAgentId,
-        codeWord: newCodeWord,
-        createdAt: new Date(),
-      });
-      
-      return { agentId: newAgentId, codeWord: newCodeWord };
-    } catch (error) {
-      console.error('Error creating new agent:', error);
-      throw new Error('Failed to create new agent');
-    }
-  };
-
-  const checkSpymasterStatus = async () => {
-    try {
+      // First fetch settings to get spymaster information
       const settingsRef = doc(db, "settings", "mainSettings");
       const settingsSnap = await getDoc(settingsRef);
       
       if (settingsSnap.exists()) {
-        const settings = settingsSnap.data();
-        if (agentSlug === settings.redSpymaster) {
-          setIsSpymasterState(true);
-          setTeamColor('red');
-          return true;
-        } else if (agentSlug === settings.blueSpymaster) {
-          setIsSpymasterState(true);
-          setTeamColor('blue');
-          return true;
-        }
+        const settings = settingsSnap.data() as SettingsData;
+        setIsSpymaster({
+          isRed: agentSlug === settings.redSpymaster,
+          isBlue: agentSlug === settings.blueSpymaster
+        });
       }
-      setIsSpymasterState(false);
-      setTeamColor(null);
-      return false;
-    } catch (error) {
-      console.error('Error checking spymaster status:', error);
-      return false;
-    }
-  };
 
-  const fetchAgentData = async () => {
-    try {
-      const isSpymaster = await checkSpymasterStatus();
+      // Then fetch agent data
       const agentRef = doc(db, "agents", agentSlug);
       const agentSnap = await getDoc(agentRef);
 
       if (agentSnap.exists()) {
         const data = agentSnap.data();
-        if (isSpymaster || (data.agentId && data.codeWord)) {
-          setAgentId(data.agentId);
-          setCodeWord(data.codeWord);
-        }
-      } else {
-        // Create new agent if it doesn't exist
-        const newAgent = await createNewAgent();
-        setAgentId(newAgent.agentId);
-        setCodeWord(newAgent.codeWord);
+        setAgentId(data.agentId);
+        setCodeWord(data.codeWord);
       }
     } catch (error) {
       console.error('Error fetching agent data:', error);
@@ -101,65 +76,117 @@ export default function AgentPage({ params }: AgentPageProps) {
     try {
       setLoading(true);
       setError(null);
-      
-      const isSpymaster = await checkSpymasterStatus();
-      if (!isSpymaster) {
-        const settingsRef = doc(db, "settings", "mainSettings");
-        const settingsSnap = await getDoc(settingsRef);
-        
-        if (!settingsSnap.exists()) {
-          setError('System not initialized. Contact administrator.');
-          return;
-        }
 
-        const agentRef = doc(db, "agents", agentSlug);
-        const agentSnap = await getDoc(agentRef);
-
-        if (agentSnap.exists()) {
-          const data = agentSnap.data();
-          if (data.agentId && data.codeWord) {
-            setAgentId(data.agentId);
-            setCodeWord(data.codeWord);
-          }
-        } else {
-          // Create new agent if it doesn't exist
-          const newAgent = await createNewAgent();
-          setAgentId(newAgent.agentId);
-          setCodeWord(newAgent.codeWord);
-        }
+      const agentNumber = parseInt(agentSlug);
+      if (isNaN(agentNumber)) {
+        setError('Invalid agent number.');
+        return;
       }
+
+      const formattedAgentId = agentNumber < 10 ? `0${agentNumber}` : `${agentNumber}`;
+      const agentRef = doc(db, "agents", agentSlug);
+      
+      // Check if agent already exists
+      const agentSnap = await getDoc(agentRef);
+      if (agentSnap.exists()) {
+        const data = agentSnap.data();
+        setAgentId(data.agentId);
+        setCodeWord(data.codeWord);
+        return;
+      }
+
+      // Get settings
+      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsSnap = await getDoc(settingsRef);
+
+      if (!settingsSnap.exists()) {
+        setError('System not initialized. Contact administrator.');
+        return;
+      }
+
+      const settingsData = settingsSnap.data() as SettingsData;
+      
+      // Check if this agent should be a spymaster
+      const isFirstAgent = agentNumber === 1;
+      const isSecondAgent = agentNumber === 2;
+      const noRedSpymaster = !settingsData.redSpymaster;
+      const noBlueSpymaster = !settingsData.blueSpymaster;
+
+      const newSettings = { ...settingsData };
+      let assignedCodeWord;
+
+      if (isFirstAgent && noRedSpymaster) {
+        // First agent becomes red spymaster
+        newSettings.redSpymaster = agentSlug;
+        assignedCodeWord = settingsData.oddCodeWord;
+        setIsSpymaster({ isRed: true, isBlue: false });
+      } else if (isSecondAgent && noBlueSpymaster) {
+        // Second agent becomes blue spymaster
+        newSettings.blueSpymaster = agentSlug;
+        assignedCodeWord = settingsData.evenCodeWord;
+        setIsSpymaster({ isRed: false, isBlue: true });
+      } else {
+        // Regular agent assignment
+        const isEven = agentNumber % 2 === 0;
+        assignedCodeWord = isEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
+      }
+
+      // Update settings if spymaster was assigned
+      if (newSettings.redSpymaster !== settingsData.redSpymaster || 
+          newSettings.blueSpymaster !== settingsData.blueSpymaster) {
+        await setDoc(settingsRef, newSettings);
+      }
+
+      // Create new agent entry
+      await setDoc(agentRef, {
+        agentId: formattedAgentId,
+        codeWord: assignedCodeWord
+      });
+
+      setAgentId(formattedAgentId);
+      setCodeWord(assignedCodeWord);
     } catch (error) {
-      console.error('Error getting code word:', error);
+      console.error('Error getting access code:', error);
       setError('Unable to get access code. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Rest of the component remains the same
+  const isAnySpymaster = isSpymaster.isRed || isSpymaster.isBlue;
+  const isRedSpymaster = isSpymaster.isRed;
+  const isBlueSpymaster = isSpymaster.isBlue;
+
   const getBgClasses = () => {
-    if (teamColor === 'red') return "bg-red-50";
-    if (teamColor === 'blue') return "bg-blue-50";
+    if (isRedSpymaster) return "bg-red-50";
+    if (isBlueSpymaster) return "bg-blue-50";
     return "bg-zinc-100";
   };
 
   const getTextColorClass = () => {
-    if (teamColor === 'red') return "text-red-600";
-    if (teamColor === 'blue') return "text-blue-600";
-    return "text-gray-900";
+    if (isRedSpymaster) return "text-red-600";
+    if (isBlueSpymaster) return "text-blue-600";
+    return "text-zinc-900";
+  };
+
+  const getBorderColorClass = () => {
+    if (isRedSpymaster) return "border-red-200";
+    if (isBlueSpymaster) return "border-blue-200";
+    return "border-zinc-200";
   };
 
   return (
     <div className={`min-h-screen ${getBgClasses()} flex items-center justify-center p-6 relative overflow-hidden`}>
-      {isSpymasterState && (
+      {/* Background Pattern for Spymasters */}
+      {isAnySpymaster && (
         <div className="absolute inset-0">
-          <div className={`absolute inset-0 ${teamColor === 'red' ? 'bg-red-100/30' : 'bg-blue-100/30'}`}>
+          <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100/30' : 'bg-blue-100/30'}`}>
             <div className={`absolute inset-0 opacity-10`}
                  style={{
                    backgroundImage: `repeating-linear-gradient(
                      45deg,
-                     ${teamColor === 'red' ? '#ef4444' : '#3b82f6'} 0px,
-                     ${teamColor === 'red' ? '#ef4444' : '#3b82f6'} 1px,
+                     ${isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
+                     ${isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
                      transparent 1px,
                      transparent 60px
                    )`
@@ -169,63 +196,77 @@ export default function AgentPage({ params }: AgentPageProps) {
         </div>
       )}
 
-      <div className={`w-full max-w-xl transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-        <div className="bg-white border border-gray-200 relative shadow-lg">
-          <div className={`border-b border-gray-200 p-4 ${isSpymasterState ? (teamColor === 'red' ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
+      <div className={`w-full max-w-2xl transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        <div className="bg-white border border-gray-200 relative shadow-lg rounded-lg overflow-hidden">
+          {/* Header Bar */}
+          <div className={`border-b ${getBorderColorClass()} p-4 ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Shield className={`w-5 h-5 ${teamColor === 'red' ? 'text-red-600' : teamColor === 'blue' ? 'text-blue-600' : 'text-gray-600'}`} />
+                <Shield className={`w-5 h-5 ${getTextColorClass()}`} />
                 <span className={`font-mono text-sm ${getTextColorClass()}`}>
-                  {isSpymasterState ? `SPYMASTER.${teamColor?.toUpperCase()}` : 'AGENT.ACCESS'}
+                  {isAnySpymaster ? `SPYMASTER.${isRedSpymaster ? 'RED' : 'BLUE'}` : 'AGENT.ACCESS'}
                 </span>
               </div>
               <div className={`font-mono text-sm ${getTextColorClass()}`}>{agentId || '--'}</div>
             </div>
           </div>
 
+          {/* Main Content */}
           <div className="p-8 relative">
+            {/* Error Message */}
             {error && (
-              <div className="mb-6 p-3 bg-red-50 border border-red-200 text-red-600 font-mono text-sm rounded">
-                {error}
-              </div>
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
 
             {agentId && codeWord ? (
               <div className="space-y-8">
-                {isSpymasterState && (
-                  <div className={`p-3 ${teamColor === 'red' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'} border rounded-md flex items-center gap-2`}>
+                {/* Spymaster Badge */}
+                {isAnySpymaster && (
+                  <div className={`p-3 ${isRedSpymaster ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'} border rounded-md flex items-center gap-2`}>
                     <Crown className="w-5 h-5" />
                     <span className="font-mono text-sm">
-                      {teamColor === 'red' ? 'RED TEAM SPYMASTER' : 'BLUE TEAM SPYMASTER'}
+                      {isRedSpymaster ? 'RED TEAM SPYMASTER' : 'BLUE TEAM SPYMASTER'}
                     </span>
                   </div>
                 )}
                 
+                {/* Agent ID Display */}
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_ID</div>
-                  <div className={`text-6xl font-mono ${getTextColorClass()} border border-gray-200 p-6 relative group ${isSpymasterState ? (teamColor === 'red' ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} rounded`}>
-                    <div className={`absolute inset-0 ${teamColor === 'red' ? 'bg-red-100' : teamColor === 'blue' ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded`} />
+                  <div className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} rounded-lg`}>
+                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
                     <span className="relative">{agentId}</span>
                   </div>
                 </div>
 
+                {/* Code Sign Display */}
                 <div>
-                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>CODE</div>
+                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>CODE SIGN</div>
                   <div className="flex justify-center">
-                    <div className={`${isSpymasterState ? (teamColor === 'red' ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} border border-gray-200 p-8 relative group flex items-center justify-center rounded aspect-square w-64`}>
-                      <div className={`absolute inset-0 ${teamColor === 'red' ? 'bg-red-100' : teamColor === 'blue' ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded`} />
-                      <IconForWord word={codeWord} size={96} className={getTextColorClass()} />
+                    <div className={`${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} 
+                                  border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}>
+                      <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} 
+                                    opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                      <IconForWord 
+                        word={codeWord} 
+                        size={300}
+                        className={getTextColorClass()} 
+                      />
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
+              // Request Access Button
               <button
                 onClick={handleGetCodeWord}
                 disabled={loading}
-                className={`w-full border border-gray-200 p-4 font-mono ${getTextColorClass()} 
+                className={`w-full border ${getBorderColorClass()} p-4 font-mono ${getTextColorClass()} 
                          hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed 
-                         transition-colors relative group rounded ${isSpymasterState ? (teamColor === 'red' ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}
+                         transition-colors relative group rounded-lg ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}
               >
                 <div className="relative flex items-center justify-center space-x-2">
                   {loading ? (
@@ -244,11 +285,12 @@ export default function AgentPage({ params }: AgentPageProps) {
             )}
           </div>
 
-          <div className={`border-t border-gray-200 p-4 ${isSpymasterState ? (teamColor === 'red' ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
+          {/* Footer Bar */}
+          <div className={`border-t ${getBorderColorClass()} p-4 ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
             <div className="flex justify-between items-center text-xs font-mono text-gray-500">
               <span>SYSTEM_ID::{agentSlug}</span>
               <span>
-                {isSpymasterState ? `SPYMASTER${agentId ? `::${agentId}` : ''}` : `AGENT${agentId ? `::${agentId}` : ''}`}
+                {isAnySpymaster ? `SPYMASTER${agentId ? `::${agentId}` : ''}` : `AGENT${agentId ? `::${agentId}` : ''}`}
               </span>
             </div>
           </div>

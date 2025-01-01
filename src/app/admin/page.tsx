@@ -11,12 +11,19 @@ import {
   getDocs,
   doc,
   setDoc,
-  writeBatch
+  writeBatch,
+  DocumentReference,
 } from "firebase/firestore";
 
 interface AgentData {
   agentId: string;
   codeWord: string;
+}
+
+interface Agent {
+  docRef: DocumentReference;
+  id: string;
+  data: AgentData;
 }
 
 export default function AdminDashboard() {
@@ -55,7 +62,8 @@ export default function AdminDashboard() {
       const agentsSnapshot = await getDocs(collection(db, "agents"));
       const agents = agentsSnapshot.docs.map(doc => ({
         docRef: doc.ref,
-        id: doc.id
+        id: doc.id,
+        data: doc.data() as AgentData
       }));
 
       // First select spymasters randomly
@@ -69,47 +77,30 @@ export default function AdminDashboard() {
         oddCodeWord: oddCodeIcon,
         redSpymaster: randomRedSpymaster.id,
         blueSpymaster: randomBlueSpymaster.id,
-        nextAgentNumber: 1
       }, { merge: true });
 
       const batch = writeBatch(db);
-      
-      // Reset all agents first
-      agents.forEach(agent => {
-        batch.update(agent.docRef, { codeWord: null, agentId: null });
-      });
 
-      // Set spymasters
+      // Update red spymaster's code word (but keep their agentId)
       batch.update(randomRedSpymaster.docRef, { 
-        agentId: "01", 
-        codeWord: oddCodeIcon 
+        codeWord: oddCodeIcon
       });
+
+      // Update blue spymaster's code word (but keep their agentId)
       batch.update(randomBlueSpymaster.docRef, { 
-        agentId: "02", 
-        codeWord: evenCodeIcon 
+        codeWord: evenCodeIcon
       });
 
-      // Distribute remaining agents
-      const remainingAgents = availableAgents;
-      let isBlueTeam = true;
-      let currentAgentNumber = 3;
-
-      while (remainingAgents.length > 0) {
-        const randomIndex = Math.floor(Math.random() * remainingAgents.length);
-        const agent = remainingAgents[randomIndex];
-        
-        const formattedAgentId = currentAgentNumber < 10 ? `0${currentAgentNumber}` : `${currentAgentNumber}`;
-        const codeWord = isBlueTeam ? evenCodeIcon : oddCodeIcon;
+      // Update remaining agents - keep their agentIds but update codewords based on team
+      availableAgents.forEach((agent: Agent) => {
+        const agentNumber = parseInt(agent.id);
+        const isEvenAgent = agentNumber % 2 === 0;
+        const codeWord = isEvenAgent ? evenCodeIcon : oddCodeIcon;
         
         batch.update(agent.docRef, { 
-          agentId: formattedAgentId,
-          codeWord 
+          codeWord
         });
-        
-        remainingAgents.splice(randomIndex, 1);
-        isBlueTeam = !isBlueTeam;
-        currentAgentNumber++;
-      }
+      });
 
       await batch.commit();
       await fetchAdminData();
@@ -125,27 +116,35 @@ export default function AdminDashboard() {
     if (!window.confirm('WARNING: This will deactivate all agents. Proceed?')) return;
     try {
       setLoading(true);
+  
+      // 1) Delete all existing agents
       const agentsSnapshot = await getDocs(collection(db, "agents"));
       const batch = writeBatch(db);
-      
       agentsSnapshot.docs.forEach(agentDoc => {
         batch.delete(doc(db, "agents", agentDoc.id));
       });
-
       if (agentsSnapshot.docs.length > 0) {
         await batch.commit();
       }
-
+  
+      // 2) Generate new code words
       const { evenCodeIcon, oddCodeIcon } = getRandomIcons();
       const settingsRef = doc(db, "settings", "mainSettings");
+  
+      // 3) Update settings so spymasters are not pre-assigned
+      //    nextAgentNumber is optional if you track it for other reasons
       await setDoc(settingsRef, {
         nextAgentNumber: 1,
         evenCodeWord: evenCodeIcon,
         oddCodeWord: oddCodeIcon,
-        redSpymaster: null,
-        blueSpymaster: null
-      });
-
+        redSpymaster: "",  // or null
+        blueSpymaster: ""  // or null
+      }, { merge: true });
+  
+      // 4) Do NOT create default agent docs for Agent 1 and Agent 2
+      //    This way, the first user to join will become Red Spymaster,
+      //    and the second user to join will become Blue Spymaster.
+  
       await fetchAdminData();
     } catch (error) {
       console.error('Error resetting agents:', error);
@@ -154,6 +153,7 @@ export default function AdminDashboard() {
       setLoading(false);
     }
   };
+  
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 p-6">
