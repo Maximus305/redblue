@@ -42,7 +42,7 @@ export default function AdminDashboard() {
 
   const fetchGameMode = async () => {
     try {
-
+      const settingsRef = doc(db, "settings", "mainSettings");
       const settingsSnap = await getDocs(collection(db, "settings"));
       if (settingsSnap.docs.length > 0) {
         const settings = settingsSnap.docs[0].data();
@@ -153,14 +153,20 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Randomly select one agent to be the spy
-      const spyIndex = Math.floor(Math.random() * agents.length);
+      // Shuffle the agents array using Fisher-Yates algorithm
+      for (let i = agents.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [agents[i], agents[j]] = [agents[j], agents[i]];
+      }
+
+      // Select the first agent from shuffled array as spy
+      const spyAgent = agents[0];
       
       // Update settings
       await setDoc(settingsRef, {
         gameMode: 'spy',
         commonCodeWord: evenCodeIcon,
-        spyAgent: agents[spyIndex].id,
+        spyAgent: spyAgent.id,
         // Clear team-related settings
         redSpymaster: "",
         blueSpymaster: "",
@@ -171,20 +177,12 @@ export default function AdminDashboard() {
       const batch = writeBatch(db);
 
       // Update all agents
-      agents.forEach((agent: Agent, index: number) => {
-        if (index === spyIndex) {
-          // This is the spy
-          batch.update(agent.docRef, { 
-            codeWord: 'spy',
-            isSpy: true
-          });
-        } else {
-          // Everyone else gets the same icon
-          batch.update(agent.docRef, { 
-            codeWord: evenCodeIcon,
-            isSpy: false
-          });
-        }
+      agents.forEach((agent: Agent) => {
+        const isSpy = agent.id === spyAgent.id;
+        batch.update(agent.docRef, { 
+          codeWord: isSpy ? 'spy' : evenCodeIcon,
+          isSpy: isSpy
+        });
       });
 
       await batch.commit();
