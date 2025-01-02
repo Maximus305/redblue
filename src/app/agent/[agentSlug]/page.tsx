@@ -6,6 +6,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  onSnapshot
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -44,45 +45,83 @@ export default function AgentPage({ params }: AgentPageProps) {
   const [isSpy, setIsSpy] = useState(false);
 
   useEffect(() => {
-    fetchAgentData();
-    setTimeout(() => setShowContent(true), 100);
-  }, [agentSlug]);
-
-  const fetchAgentData = async () => {
-    try {
-      // First fetch settings to get game mode and roles
-      const settingsRef = doc(db, "settings", "mainSettings");
-      const settingsSnap = await getDoc(settingsRef);
-      
-      if (settingsSnap.exists()) {
-        const settings = settingsSnap.data() as SettingsData;
+    // Set up real-time listener for settings
+    const settingsRef = doc(db, "settings", "mainSettings");
+    const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const settings = snapshot.data() as SettingsData;
         const currentGameMode = settings.gameMode || 'teams';
         setGameMode(currentGameMode);
         
         if (currentGameMode === 'spy') {
           setIsSpy(agentSlug === settings.spyAgent);
           setIsSpymaster({ isRed: false, isBlue: false });
+          
+          // Update agent's code word if game mode changes to spy
+          updateAgentForSpyMode(settings);
         } else {
           setIsSpy(false);
           setIsSpymaster({
             isRed: agentSlug === settings.redSpymaster,
             isBlue: agentSlug === settings.blueSpymaster
           });
+          // Update agent's code word for team mode
+          updateAgentForTeamMode(settings);
         }
       }
+    });
 
-      // Then fetch agent data
-      const agentRef = doc(db, "agents", agentSlug);
-      const agentSnap = await getDoc(agentRef);
-
-      if (agentSnap.exists()) {
-        const data = agentSnap.data();
-        setAgentId(data.agentId);
-        setCodeWord(data.codeWord);
+    // Set up real-time listener for agent data
+    const agentRef = doc(db, "agents", agentSlug);
+    const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setAgentId(data.agentId ?? null);
+        setCodeWord(data.codeWord ?? null);
       }
+    });
+
+    setTimeout(() => setShowContent(true), 100);
+
+    // Cleanup listeners on unmount
+    return () => {
+      unsubscribeSettings();
+      unsubscribeAgent();
+    };
+  }, [agentSlug]);
+
+  const updateAgentForSpyMode = async (settings: SettingsData) => {
+    if (!agentId) return;
+
+    const agentRef = doc(db, "agents", agentSlug);
+    const isSpy = agentSlug === settings.spyAgent;
+    
+    try {
+      await setDoc(agentRef, {
+        agentId,
+        codeWord: isSpy ? 'spy' : settings.commonCodeWord,
+        isSpy
+      }, { merge: true });
     } catch (error) {
-      console.error('Error fetching agent data:', error);
-      setError('System offline. Please try again.');
+      console.error('Error updating agent for spy mode:', error);
+    }
+  };
+
+  const updateAgentForTeamMode = async (settings: SettingsData) => {
+    if (!agentId) return;
+
+    const agentRef = doc(db, "agents", agentSlug);
+    const agentNumber = parseInt(agentSlug);
+    const isEven = agentNumber % 2 === 0;
+    
+    try {
+      await setDoc(agentRef, {
+        agentId,
+        codeWord: isEven ? settings.evenCodeWord : settings.oddCodeWord,
+        isSpy: false
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error updating agent for team mode:', error);
     }
   };
 
@@ -162,7 +201,7 @@ export default function AgentPage({ params }: AgentPageProps) {
       // Create new agent entry
       await setDoc(agentRef, {
         agentId: formattedAgentId,
-        codeWord: assignedCodeWord,
+        codeWord: assignedCodeWord ?? null,
         isSpy: isSpyRole
       });
       setAgentId(formattedAgentId ?? null);
@@ -357,4 +396,4 @@ export default function AgentPage({ params }: AgentPageProps) {
       </div>
     </div>
   );
-};
+}
