@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Shuffle, RotateCcw, Shield, Terminal, Scan, Power } from 'lucide-react';
+import { AlertCircle, RotateCcw, Shield, Terminal, Scan, Power, Eye, Users } from 'lucide-react';
 import { getRandomIcons } from "@/utils/codeWords";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +18,7 @@ import {
 interface AgentData {
   agentId: string;
   codeWord: string;
+  isSpy?: boolean;
 }
 
 interface Agent {
@@ -31,11 +32,26 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showStats, setShowStats] = useState(false);
+  const [gameMode, setGameMode] = useState<'teams' | 'spy'>('teams');
 
   useEffect(() => {
     fetchAdminData();
+    fetchGameMode();
     setTimeout(() => setShowStats(true), 100);
   }, []);
+
+  const fetchGameMode = async () => {
+    try {
+
+      const settingsSnap = await getDocs(collection(db, "settings"));
+      if (settingsSnap.docs.length > 0) {
+        const settings = settingsSnap.docs[0].data();
+        setGameMode(settings.gameMode || 'teams');
+      }
+    } catch (error) {
+      console.error('Error fetching game mode:', error);
+    }
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -73,36 +89,41 @@ export default function AdminDashboard() {
 
       // Update settings with new spymasters and code words
       await setDoc(settingsRef, {
+        gameMode: 'teams',
         evenCodeWord: evenCodeIcon,
         oddCodeWord: oddCodeIcon,
         redSpymaster: randomRedSpymaster.id,
         blueSpymaster: randomBlueSpymaster.id,
-      }, { merge: true });
+      });
 
       const batch = writeBatch(db);
 
-      // Update red spymaster's code word (but keep their agentId)
+      // Update red spymaster's code word
       batch.update(randomRedSpymaster.docRef, { 
-        codeWord: oddCodeIcon
+        codeWord: oddCodeIcon,
+        isSpy: false
       });
 
-      // Update blue spymaster's code word (but keep their agentId)
+      // Update blue spymaster's code word
       batch.update(randomBlueSpymaster.docRef, { 
-        codeWord: evenCodeIcon
+        codeWord: evenCodeIcon,
+        isSpy: false
       });
 
-      // Update remaining agents - keep their agentIds but update codewords based on team
+      // Update remaining agents
       availableAgents.forEach((agent: Agent) => {
         const agentNumber = parseInt(agent.id);
         const isEvenAgent = agentNumber % 2 === 0;
         const codeWord = isEvenAgent ? evenCodeIcon : oddCodeIcon;
         
         batch.update(agent.docRef, { 
-          codeWord
+          codeWord,
+          isSpy: false
         });
       });
 
       await batch.commit();
+      setGameMode('teams');
       await fetchAdminData();
     } catch (error) {
       console.error('Error shuffling icons:', error);
@@ -112,12 +133,77 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleStartSpyGame = async () => {
+    if (!window.confirm('Start Spy Game Mode? This will assign the same image to all agents except one spy.')) return;
+    try {
+      setLoading(true);
+      const { evenCodeIcon } = getRandomIcons(); // We'll use this as the common image
+      const settingsRef = doc(db, "settings", "mainSettings");
+      
+      // Get all agents
+      const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agents = agentsSnapshot.docs.map(doc => ({
+        docRef: doc.ref,
+        id: doc.id,
+        data: doc.data() as AgentData
+      }));
+
+      if (agents.length < 2) {
+        setError('Need at least 2 agents to start spy game');
+        return;
+      }
+
+      // Randomly select one agent to be the spy
+      const spyIndex = Math.floor(Math.random() * agents.length);
+      
+      // Update settings
+      await setDoc(settingsRef, {
+        gameMode: 'spy',
+        commonCodeWord: evenCodeIcon,
+        spyAgent: agents[spyIndex].id,
+        // Clear team-related settings
+        redSpymaster: "",
+        blueSpymaster: "",
+        evenCodeWord: "",
+        oddCodeWord: ""
+      });
+
+      const batch = writeBatch(db);
+
+      // Update all agents
+      agents.forEach((agent: Agent, index: number) => {
+        if (index === spyIndex) {
+          // This is the spy
+          batch.update(agent.docRef, { 
+            codeWord: 'spy',
+            isSpy: true
+          });
+        } else {
+          // Everyone else gets the same icon
+          batch.update(agent.docRef, { 
+            codeWord: evenCodeIcon,
+            isSpy: false
+          });
+        }
+      });
+
+      await batch.commit();
+      setGameMode('spy');
+      await fetchAdminData();
+    } catch (error) {
+      console.error('Error starting spy game:', error);
+      setError('Failed to start spy game');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = async () => {
-    if (!window.confirm('WARNING: This will deactivate all agents. Proceed?')) return;
+    if (!window.confirm('WARNING: This will deactivate all agents and reset the game. Proceed?')) return;
     try {
       setLoading(true);
   
-      // 1) Delete all existing agents
+      // Delete all existing agents
       const agentsSnapshot = await getDocs(collection(db, "agents"));
       const batch = writeBatch(db);
       agentsSnapshot.docs.forEach(agentDoc => {
@@ -127,33 +213,35 @@ export default function AdminDashboard() {
         await batch.commit();
       }
   
-      // 2) Generate new code words
+      // Generate new code words for team mode
       const { evenCodeIcon, oddCodeIcon } = getRandomIcons();
       const settingsRef = doc(db, "settings", "mainSettings");
   
-      // 3) Update settings so spymasters are not pre-assigned
-      //    nextAgentNumber is optional if you track it for other reasons
+      // Reset settings to default team mode
       await setDoc(settingsRef, {
+        gameMode: 'teams',
         nextAgentNumber: 1,
         evenCodeWord: evenCodeIcon,
         oddCodeWord: oddCodeIcon,
-        redSpymaster: "",  // or null
-        blueSpymaster: ""  // or null
-      }, { merge: true });
+        redSpymaster: "",
+        blueSpymaster: "",
+        spyAgent: "",
+        commonCodeWord: ""
+      });
   
-      // 4) Do NOT create default agent docs for Agent 1 and Agent 2
-      //    This way, the first user to join will become Red Spymaster,
-      //    and the second user to join will become Blue Spymaster.
-  
+      setGameMode('teams');
       await fetchAdminData();
     } catch (error) {
-      console.error('Error resetting agents:', error);
+      console.error('Error resetting system:', error);
       setError('System reset failed');
     } finally {
       setLoading(false);
     }
   };
-  
+
+  const getGameModeDisplay = () => {
+    return gameMode === 'spy' ? 'SPY MODE ACTIVE' : 'TEAM MODE ACTIVE';
+  };
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 p-6">
@@ -188,9 +276,12 @@ export default function AdminDashboard() {
             <Terminal className="h-5 w-5 text-red-600" />
             <h1 className="text-xl font-mono tracking-tight text-zinc-900">SYSTEM CONTROL</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Power className="h-4 w-4 text-red-600" />
-            <span className="text-sm font-mono text-zinc-600">ACTIVE</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-mono text-zinc-600">{getGameModeDisplay()}</span>
+            <div className="flex items-center gap-2">
+              <Power className="h-4 w-4 text-red-600" />
+              <span className="text-sm font-mono text-zinc-600">ACTIVE</span>
+            </div>
           </div>
         </div>
 
@@ -220,7 +311,7 @@ export default function AdminDashboard() {
                 {activeAgents.map((agent) => (
                   <div
                     key={agent.agentId}
-                    className="aspect-square flex items-center justify-center bg-zinc-50 border border-zinc-200 hover:border-red-600/50 transition-colors"
+                    className={`aspect-square flex items-center justify-center bg-zinc-50 border-zinc-200 `}
                   >
                     <span className="font-mono text-sm text-zinc-900">{agent.agentId}</span>
                   </div>
@@ -246,8 +337,17 @@ export default function AdminDashboard() {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-50 text-zinc-900 border border-zinc-200 hover:border-red-600/50 disabled:opacity-50 transition-all duration-200 font-mono"
               >
-                <Shuffle className="h-4 w-4" />
-                {loading ? "PROCESSING..." : "REDISTRIBUTE CODES"}
+                <Users className="h-4 w-4" />
+                {loading ? "PROCESSING..." : "START TEAM MODE"}
+              </button>
+
+              <button
+                onClick={handleStartSpyGame}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-50 text-zinc-900 border border-zinc-200 hover:border-red-600/50 disabled:opacity-50 transition-all duration-200 font-mono"
+              >
+                <Eye className="h-4 w-4" />
+                {loading ? "PROCESSING..." : "START SPY MODE"}
               </button>
 
               <button
@@ -262,8 +362,8 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* System Log */}
-        <Card className="border border-zinc-200 bg-white">
+      {/* System Log */}
+      <Card className="border border-zinc-200 bg-white">
           <CardContent className="p-4">
             <div className="font-mono text-sm space-y-1">
               <div className="flex items-center gap-2">
@@ -273,6 +373,10 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <span className="text-red-600">{">"}</span>
                 <span className="text-zinc-600">{activeAgents.length} agents active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-red-600">{">"}</span>
+                <span className="text-zinc-600">{getGameModeDisplay()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-red-600">{">"}</span>

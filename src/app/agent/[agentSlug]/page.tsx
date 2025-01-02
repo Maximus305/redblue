@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, use } from 'react';
-import { Shield, Key, Loader2, Crown, AlertCircle } from 'lucide-react';
+import { Shield, Key, Loader2, Crown, AlertCircle, Eye } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -21,6 +21,9 @@ interface SettingsData {
   blueSpymaster: string;
   evenCodeWord: string;
   oddCodeWord: string;
+  gameMode?: 'teams' | 'spy';
+  commonCodeWord?: string;
+  spyAgent?: string;
 }
 
 export default function AgentPage({ params }: AgentPageProps) {
@@ -37,6 +40,8 @@ export default function AgentPage({ params }: AgentPageProps) {
     isRed: boolean;
     isBlue: boolean;
   }>({ isRed: false, isBlue: false });
+  const [gameMode, setGameMode] = useState<'teams' | 'spy'>('teams');
+  const [isSpy, setIsSpy] = useState(false);
 
   useEffect(() => {
     fetchAgentData();
@@ -45,16 +50,25 @@ export default function AgentPage({ params }: AgentPageProps) {
 
   const fetchAgentData = async () => {
     try {
-      // First fetch settings to get spymaster information
+      // First fetch settings to get game mode and roles
       const settingsRef = doc(db, "settings", "mainSettings");
       const settingsSnap = await getDoc(settingsRef);
       
       if (settingsSnap.exists()) {
         const settings = settingsSnap.data() as SettingsData;
-        setIsSpymaster({
-          isRed: agentSlug === settings.redSpymaster,
-          isBlue: agentSlug === settings.blueSpymaster
-        });
+        const currentGameMode = settings.gameMode || 'teams';
+        setGameMode(currentGameMode);
+        
+        if (currentGameMode === 'spy') {
+          setIsSpy(agentSlug === settings.spyAgent);
+          setIsSpymaster({ isRed: false, isBlue: false });
+        } else {
+          setIsSpy(false);
+          setIsSpymaster({
+            isRed: agentSlug === settings.redSpymaster,
+            isBlue: agentSlug === settings.blueSpymaster
+          });
+        }
       }
 
       // Then fetch agent data
@@ -105,46 +119,54 @@ export default function AgentPage({ params }: AgentPageProps) {
       }
 
       const settingsData = settingsSnap.data() as SettingsData;
-      
-      // Check if this agent should be a spymaster
-      const isFirstAgent = agentNumber === 1;
-      const isSecondAgent = agentNumber === 2;
-      const noRedSpymaster = !settingsData.redSpymaster;
-      const noBlueSpymaster = !settingsData.blueSpymaster;
+      const currentGameMode = settingsData.gameMode || 'teams';
+      setGameMode(currentGameMode);
 
-      const newSettings = { ...settingsData };
       let assignedCodeWord;
+      let isSpyRole = false;
 
-      if (isFirstAgent && noRedSpymaster) {
-        // First agent becomes red spymaster
-        newSettings.redSpymaster = agentSlug;
-        assignedCodeWord = settingsData.oddCodeWord;
-        setIsSpymaster({ isRed: true, isBlue: false });
-      } else if (isSecondAgent && noBlueSpymaster) {
-        // Second agent becomes blue spymaster
-        newSettings.blueSpymaster = agentSlug;
-        assignedCodeWord = settingsData.evenCodeWord;
-        setIsSpymaster({ isRed: false, isBlue: true });
+      if (currentGameMode === 'spy') {
+        // Spy game mode logic
+        if (agentSlug === settingsData.spyAgent) {
+          assignedCodeWord = 'spy';
+          isSpyRole = true;
+        } else {
+          assignedCodeWord = settingsData.commonCodeWord;
+        }
+        setIsSpy(isSpyRole);
       } else {
-        // Regular agent assignment
-        const isEven = agentNumber % 2 === 0;
-        assignedCodeWord = isEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
-      }
+        // Teams game mode logic
+        const isFirstAgent = agentNumber === 1;
+        const isSecondAgent = agentNumber === 2;
+        const noRedSpymaster = !settingsData.redSpymaster;
+        const noBlueSpymaster = !settingsData.blueSpymaster;
 
-      // Update settings if spymaster was assigned
-      if (newSettings.redSpymaster !== settingsData.redSpymaster || 
-          newSettings.blueSpymaster !== settingsData.blueSpymaster) {
-        await setDoc(settingsRef, newSettings);
+        if (isFirstAgent && noRedSpymaster) {
+          // First agent becomes red spymaster
+          await setDoc(settingsRef, { ...settingsData, redSpymaster: agentSlug }, { merge: true });
+          assignedCodeWord = settingsData.oddCodeWord;
+          setIsSpymaster({ isRed: true, isBlue: false });
+        } else if (isSecondAgent && noBlueSpymaster) {
+          // Second agent becomes blue spymaster
+          await setDoc(settingsRef, { ...settingsData, blueSpymaster: agentSlug }, { merge: true });
+          assignedCodeWord = settingsData.evenCodeWord;
+          setIsSpymaster({ isRed: false, isBlue: true });
+        } else {
+          // Regular agent assignment
+          const isEven = agentNumber % 2 === 0;
+          assignedCodeWord = isEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
+          setIsSpymaster({ isRed: false, isBlue: false });
+        }
       }
 
       // Create new agent entry
       await setDoc(agentRef, {
         agentId: formattedAgentId,
-        codeWord: assignedCodeWord
+        codeWord: assignedCodeWord,
+        isSpy: isSpyRole
       });
-
-      setAgentId(formattedAgentId);
-      setCodeWord(assignedCodeWord);
+      setAgentId(formattedAgentId ?? null);
+      setCodeWord(assignedCodeWord ?? null);
     } catch (error) {
       console.error('Error getting access code:', error);
       setError('Unable to get access code. Please try again.');
@@ -158,35 +180,52 @@ export default function AgentPage({ params }: AgentPageProps) {
   const isBlueSpymaster = isSpymaster.isBlue;
 
   const getBgClasses = () => {
+    if (isSpy) return "bg-red-50";
     if (isRedSpymaster) return "bg-red-50";
     if (isBlueSpymaster) return "bg-blue-50";
     return "bg-zinc-100";
   };
 
   const getTextColorClass = () => {
+    if (isSpy) return "text-red-600";
     if (isRedSpymaster) return "text-red-600";
     if (isBlueSpymaster) return "text-blue-600";
     return "text-zinc-900";
   };
 
   const getBorderColorClass = () => {
+    if (isSpy) return "border-red-200";
     if (isRedSpymaster) return "border-red-200";
     if (isBlueSpymaster) return "border-blue-200";
     return "border-zinc-200";
   };
 
+  const getRoleDisplay = () => {
+    if (gameMode === 'spy') {
+      return isSpy ? 'SPY' : 'AGENT';
+    } else {
+      if (isRedSpymaster) return 'RED SPYMASTER';
+      if (isBlueSpymaster) return 'BLUE SPYMASTER';
+      return 'AGENT';
+    }
+  };
+
   return (
     <div className={`min-h-screen ${getBgClasses()} flex items-center justify-center p-6 relative overflow-hidden`}>
-      {/* Background Pattern for Spymasters */}
-      {isAnySpymaster && (
+      {/* Background Pattern */}
+      {(isAnySpymaster || isSpy) && (
         <div className="absolute inset-0">
-          <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100/30' : 'bg-blue-100/30'}`}>
+          <div className={`absolute inset-0 ${
+            isSpy ? 'bg-red-100/30' :
+            isRedSpymaster ? 'bg-red-100/30' : 
+            'bg-blue-100/30'
+          }`}>
             <div className={`absolute inset-0 opacity-10`}
                  style={{
                    backgroundImage: `repeating-linear-gradient(
                      45deg,
-                     ${isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
-                     ${isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
+                     ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
+                     ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
                      transparent 1px,
                      transparent 60px
                    )`
@@ -199,12 +238,16 @@ export default function AgentPage({ params }: AgentPageProps) {
       <div className={`w-full max-w-2xl transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
         <div className="bg-white border border-gray-200 relative shadow-lg rounded-lg overflow-hidden">
           {/* Header Bar */}
-          <div className={`border-b ${getBorderColorClass()} p-4 ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
+          <div className={`border-b ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Shield className={`w-5 h-5 ${getTextColorClass()}`} />
+                {isSpy ? (
+                  <Eye className={`w-5 h-5 ${getTextColorClass()}`} />
+                ) : (
+                  <Shield className={`w-5 h-5 ${getTextColorClass()}`} />
+                )}
                 <span className={`font-mono text-sm ${getTextColorClass()}`}>
-                  {isAnySpymaster ? `SPYMASTER.${isRedSpymaster ? 'RED' : 'BLUE'}` : 'AGENT.ACCESS'}
+                  {getRoleDisplay()}
                 </span>
               </div>
               <div className={`font-mono text-sm ${getTextColorClass()}`}>{agentId || '--'}</div>
@@ -223,12 +266,16 @@ export default function AgentPage({ params }: AgentPageProps) {
 
             {agentId && codeWord ? (
               <div className="space-y-8">
-                {/* Spymaster Badge */}
-                {isAnySpymaster && (
-                  <div className={`p-3 ${isRedSpymaster ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'} border rounded-md flex items-center gap-2`}>
-                    <Crown className="w-5 h-5" />
+                {/* Role Badge */}
+                {(isAnySpymaster || isSpy) && (
+                  <div className={`p-3 ${getBgClasses()} ${getTextColorClass()} ${getBorderColorClass()} border rounded-md flex items-center gap-2`}>
+                    {isSpy ? (
+                      <Eye className="w-5 h-5" />
+                    ) : (
+                      <Crown className="w-5 h-5" />
+                    )}
                     <span className="font-mono text-sm">
-                      {isRedSpymaster ? 'RED TEAM SPYMASTER' : 'BLUE TEAM SPYMASTER'}
+                      {getRoleDisplay()}
                     </span>
                   </div>
                 )}
@@ -236,25 +283,39 @@ export default function AgentPage({ params }: AgentPageProps) {
                 {/* Agent ID Display */}
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_ID</div>
-                  <div className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} rounded-lg`}>
-                    <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                  <div className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${getBgClasses()} rounded-lg`}>
+                    <div className={`absolute inset-0 ${
+                      isSpy ? 'bg-red-100' :
+                      isRedSpymaster ? 'bg-red-100' :
+                      isBlueSpymaster ? 'bg-blue-100' :
+                      'bg-gray-100'
+                    } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
                     <span className="relative">{agentId}</span>
                   </div>
                 </div>
 
                 {/* Code Sign Display */}
                 <div>
-                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>CODE SIGN</div>
+                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>
+                    {isSpy ? 'SPY STATUS' : 'CODE SIGN'}
+                  </div>
                   <div className="flex justify-center">
-                    <div className={`${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'} 
-                                  border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}>
-                      <div className={`absolute inset-0 ${isRedSpymaster ? 'bg-red-100' : isBlueSpymaster ? 'bg-blue-100' : 'bg-gray-100'} 
-                                    opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
-                      <IconForWord 
-                        word={codeWord} 
-                        size={300}
-                        className={getTextColorClass()} 
-                      />
+                    <div className={`${getBgClasses()} border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}>
+                      <div className={`absolute inset-0 ${
+                        isSpy ? 'bg-red-100' :
+                        isRedSpymaster ? 'bg-red-100' :
+                        isBlueSpymaster ? 'bg-blue-100' :
+                        'bg-gray-100'
+                      } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                      {gameMode === 'spy' && isSpy ? (
+                        <div className="text-6xl font-mono text-red-600">SPY</div>
+                      ) : (
+                        <IconForWord 
+                          word={codeWord} 
+                          size={300}
+                          className={getTextColorClass()} 
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -266,7 +327,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                 disabled={loading}
                 className={`w-full border ${getBorderColorClass()} p-4 font-mono ${getTextColorClass()} 
                          hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed 
-                         transition-colors relative group rounded-lg ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}
+                         transition-colors relative group rounded-lg ${getBgClasses()}`}
               >
                 <div className="relative flex items-center justify-center space-x-2">
                   {loading ? (
@@ -286,16 +347,14 @@ export default function AgentPage({ params }: AgentPageProps) {
           </div>
 
           {/* Footer Bar */}
-          <div className={`border-t ${getBorderColorClass()} p-4 ${isAnySpymaster ? (isRedSpymaster ? 'bg-red-50' : 'bg-blue-50') : 'bg-gray-50'}`}>
+          <div className={`border-t ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex justify-between items-center text-xs font-mono text-gray-500">
               <span>SYSTEM_ID::{agentSlug}</span>
-              <span>
-                {isAnySpymaster ? `SPYMASTER${agentId ? `::${agentId}` : ''}` : `AGENT${agentId ? `::${agentId}` : ''}`}
-              </span>
+              <span>{getRoleDisplay()}{agentId ? `::${agentId}` : ''}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
