@@ -42,7 +42,7 @@ export default function AdminDashboard() {
 
   const fetchGameMode = async () => {
     try {
-      const settingsRef = doc(db, "settings", "mainSettings");
+  
       const settingsSnap = await getDocs(collection(db, "settings"));
       if (settingsSnap.docs.length > 0) {
         const settings = settingsSnap.docs[0].data();
