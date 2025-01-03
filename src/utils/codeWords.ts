@@ -21,7 +21,7 @@ export const IMAGE_MAPPINGS: ImageMappingType = {
   'Ring': '/images/ring.png',
   'Rocket': '/images/rocket.png',
   'Car': '/images/car.png',
-  'Cards': '/images/cards.png',
+  'Hack': '/images/watch.png',
   'Key': '/images/key.png'
 };
 

@@ -349,8 +349,8 @@ export default function AgentPage({ params }: AgentPageProps) {
                       {gameMode === 'spy' && isSpy ? (
                         <div className="text-6xl font-mono text-red-600">SPY</div>
                       ) : (
-                        <IconForWord 
-                          word={codeWord} 
+                        <IconForWord
+                        word={codeWord} 
                           size={300}
                           className={getTextColorClass()} 
                         />
@@ -382,6 +382,34 @@ export default function AgentPage({ params }: AgentPageProps) {
                   )}
                 </div>
               </button>
+            )}
+
+            {/* Spy Gallery - Only shown to spies */}
+            {isSpy && agentId && (
+              <div className="mt-12 space-y-4">
+                <div className={`font-mono text-lg ${getTextColorClass()}`}>ALL POSSIBLE CODE SIGNS</div>
+                <div className="grid grid-cols-4 gap-4">
+                  {[
+                    'Atlas', 'Balloon', 'Bamboo', 'Basket',
+                    'Bell', 'Boat', 'Bullet', 'Camera',
+                    'Castle', 'Chair', 'Clock', 'Diamond',
+                    'Hammer', 'Lantern', 'Lock', 'Ring',
+                    'Rocket', 'Car', 'Hack', 'Key'
+                  ].map((word) => (
+                    <div 
+                      key={word}
+                      className={`${getBgClasses()} border ${getBorderColorClass()} p-4 rounded-lg aspect-square flex items-center justify-center relative group`}
+                    >
+                      <div className={`absolute inset-0 bg-red-100 opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                      <IconForWord 
+                        word={word} 
+                        size={80}
+                        className={getTextColorClass()} 
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
