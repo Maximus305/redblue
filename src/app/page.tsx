@@ -1,8 +1,15 @@
 "use client"
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Shield, Key, Loader2 } from 'lucide-react';
 
 const AgentNav = () => {
+  const router = useRouter();
   const [time, setTime] = useState('00:00:00');
+  const [name, setName] = useState('');
+  const [agentCode, setAgentCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showCode, setShowCode] = useState(false);
   
   useEffect(() => {
     const timer = setInterval(() => {
@@ -11,13 +18,38 @@ const AgentNav = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const agents = [
-    { id: '01', name: 'TIM', path: '/agent/01', clearance: 'good' },
-    { id: '02', name: 'LILY', path: '/agent/02', clearance: 'good' },
-    { id: '03', name: 'MARK', path: '/agent/03', clearance: 'good' },
-    { id: '04', name: 'ANESSA', path: '/agent/04', clearance: 'good' },
-    { id: '05', name: 'MAX', path: '/agent/05', clearance: 'good' }
-  ];
+  // Generate a random numeric code of specified length
+  const generateCode = (length = 16) => {
+    const chars = '0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const handleNameSubmit = (e: { preventDefault: () => void; }) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    
+    setLoading(true);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      const code = generateCode(32);
+      setAgentCode(code);
+      setShowCode(true);
+      setLoading(false);
+    }, 1500);
+  };
+
+  const handleJoinMission = () => {
+    // In a real app, we'd store this in a database
+    // For now, we'll just pass it through URL
+    localStorage.setItem('agentName', name);
+    localStorage.setItem('agentCode', agentCode);
+    router.push(`/agent/${agentCode}`);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-100 overflow-hidden font-mono">
@@ -44,83 +76,92 @@ const AgentNav = () => {
         <div className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-sm border-b border-black/10">
           <div className="max-w-4xl mx-auto h-full px-8 flex items-center justify-between">
             <div className="text-sm">SYS.TIME: {time}</div>
-            <div className="text-sm tracking-widest">CLEARANCE_VERIFIED</div>
+            <div className="text-sm tracking-widest">ACCESS_POINT</div>
           </div>
         </div>
 
         {/* Main Section */}
-        <div className="pt-32">
-          {/* Title */}
-          <div className="text-center mb-16">
-            <h1 className="text-8xl font-bold tracking-tighter relative inline-block">
-              <span className="absolute -inset-8 bg-blue-500/10 blur-2xl rounded-full" />
-              <span className="relative">NEXUS</span>
-            </h1>
-          </div>
-
-          {/* Agents List */}
-          <div className="max-w-4xl mx-auto px-8">
-            <div className="space-y-6">
-              {agents.map((agent, index) => (
-                <a
-                  key={index}
-                  href={agent.path}
-                  className="block group"
-                >
-                  <div className="relative bg-white rounded-sm overflow-hidden
-                                transform transition-all duration-300 group-hover:scale-[1.02]
-                                group-hover:shadow-[0_0_30px_rgba(0,0,0,0.1)]">
-                    {/* Dramatic Background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent 
-                                  opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    
-                    {/* Main Content */}
-                    <div className="relative p-8 flex items-center justify-between">
-                      {/* Left Section */}
-                      <div className="flex items-center space-x-12">
-                        {/* Agent Number with Decorative Elements */}
-                        <div className="relative">
-                          <div className="absolute -inset-4 bg-blue-500/5 rounded-sm transform rotate-45
-                                        scale-0 group-hover:scale-100 transition-transform duration-300" />
-                          <div className="text-5xl font-bold relative">{agent.id}</div>
-                        </div>
-                        
-                        {/* Agent Name */}
-                        <div className="text-2xl tracking-widest">{agent.name}</div>
-                      </div>
-
-                      {/* Right Section */}
-                      <div className="flex items-center space-x-8">
-                        <div className="text-sm tracking-wider opacity-0 group-hover:opacity-100 
-                                      transition-all duration-300">
-                          {agent.clearance}_CLASS
-                        </div>
-                        <div className="w-8 h-8 border-2 border-black/10 transform rotate-45
-                                      group-hover:border-blue-500/50 transition-colors duration-300" />
-                      </div>
-                    </div>
-
-                    {/* Progress Bars */}
-                    <div className="absolute bottom-0 left-0 right-0 flex">
-                      {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex-1 h-1 bg-black/5">
-                          <div className="h-full bg-blue-500 transform -translate-x-full 
-                                        group-hover:translate-x-0 transition-transform duration-700"
-                               style={{ transitionDelay: `${i * 100}ms` }} />
-                        </div>
-                      ))}
-                    </div>
+        <div className="pt-32 flex justify-center items-center">
+          <div className="bg-white border border-zinc-200 shadow-lg rounded-lg w-full max-w-md p-8">
+            {!showCode ? (
+              <>
+                <div className="text-center mb-8">
+                  <img src="/images/spygame.png" alt="Spy Game" className="w-full h-auto mb-2" />
+                  <p className="text-zinc-500 text-sm">Enter your name to receive an agent code</p>
+                </div>
+                
+                <form onSubmit={handleNameSubmit}>
+                  <div className="mb-6">
+                    <label htmlFor="name" className="block text-sm font-medium text-zinc-700 mb-2">
+                      AGENT NAME
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full p-3 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-zinc-50 font-mono"
+                      placeholder="ENTER YOUR NAME"
+                      required
+                    />
                   </div>
-                </a>
-              ))}
-            </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={loading || !name.trim()}
+                    className="w-full bg-zinc-800 text-white py-3 rounded-md hover:bg-zinc-700 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>PROCESSING...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Key className="w-4 h-4" />
+                        <span>GENERATE AGENT CODE</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <div className="flex justify-center mb-4">
+                    <Shield className="w-12 h-12 text-blue-500" />
+                  </div>
+                  <h1 className="text-xl font-bold tracking-tighter mb-2">WELCOME AGENT {name.toUpperCase()}</h1>
+                  <p className="text-zinc-500 text-sm">Your unique access code has been generated</p>
+                </div>
+                
+                <div className="mb-6 bg-zinc-50 p-4 border border-zinc-200 rounded-md">
+                  <div className="text-xs text-zinc-500 mb-2">YOUR CODE</div>
+                  <div className="text-lg break-all font-mono tracking-wider select-all">
+                    {agentCode}
+                  </div>
+                </div>
+                
+                <div className="text-xs text-zinc-500 mb-6 text-center">
+                  Please copy this code for future reference
+                </div>
+                
+                <button
+                  onClick={handleJoinMission}
+                  className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>JOIN MISSION</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="fixed bottom-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-sm border-t border-black/10">
           <div className="max-w-4xl mx-auto h-full px-8 flex items-center justify-between">
-            <div className="text-sm">QUANTUM_MATRIX:ACTIVE</div>
+            <div className="text-sm">SYSTEM:ACTIVE</div>
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
               <span className="text-sm">READY</span>

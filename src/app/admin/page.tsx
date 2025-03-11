@@ -19,6 +19,7 @@ interface AgentData {
   agentId: string;
   codeWord: string;
   isSpy?: boolean;
+  roundsAgoWasSpy?: number; // Added field to track when agent was last spy
 }
 
 interface Agent {
@@ -42,7 +43,6 @@ export default function AdminDashboard() {
 
   const fetchGameMode = async () => {
     try {
-  
       const settingsSnap = await getDocs(collection(db, "settings"));
       if (settingsSnap.docs.length > 0) {
         const settings = settingsSnap.docs[0].data();
@@ -153,20 +153,47 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Shuffle the agents array using Fisher-Yates algorithm
-      for (let i = agents.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [agents[i], agents[j]] = [agents[j], agents[i]];
+      // Function to calculate weight based on roundsAgoWasSpy
+      // Lower weight means LESS chance of being selected as spy
+      const getWeight = (roundsAgo: number | undefined) => {
+        if (!roundsAgo || typeof roundsAgo !== 'number') return 1; // Default weight if no history
+        if (roundsAgo === 1) return 0.25; // 75% reduction if chosen last round
+        if (roundsAgo === 2) return 0.5;  // 50% reduction if chosen 2 rounds ago
+        if (roundsAgo === 3) return 0.75; // 25% reduction if chosen 3 rounds ago
+        return 1; // Full chance if not chosen for 4+ rounds
+      };
+      
+      // Calculate the weight for each agent
+      const agentsWithWeights = agents.map(agent => {
+        return {
+          ...agent,
+          weight: getWeight(agent.data.roundsAgoWasSpy)
+        };
+      });
+      
+      // Calculate the total weight
+      const totalWeight = agentsWithWeights.reduce((sum, agent) => sum + agent.weight, 0);
+      
+      // Select a spy using weighted random selection
+      let randomValue = Math.random() * totalWeight;
+      let selectedSpyAgent = agentsWithWeights[0]; // Default in case something goes wrong
+      
+      // Find the agent that makes randomValue drop below zero
+      for (const agent of agentsWithWeights) {
+        randomValue -= agent.weight;
+        if (randomValue <= 0) {
+          selectedSpyAgent = agent;
+          break;
+        }
       }
 
-      // Select the first agent from shuffled array as spy
-      const spyAgent = agents[0];
+      console.log("Selected spy agent:", selectedSpyAgent.id, "with weight:", selectedSpyAgent.weight);
       
       // Update settings
       await setDoc(settingsRef, {
         gameMode: 'spy',
         commonCodeWord: evenCodeIcon,
-        spyAgent: spyAgent.id,
+        spyAgent: selectedSpyAgent.id,
         // Clear team-related settings
         redSpymaster: "",
         blueSpymaster: "",
@@ -178,11 +205,27 @@ export default function AdminDashboard() {
 
       // Update all agents
       agents.forEach((agent: Agent) => {
-        const isSpy = agent.id === spyAgent.id;
-        batch.update(agent.docRef, { 
-          codeWord: isSpy ? 'spy' : evenCodeIcon,
-          isSpy: isSpy
-        });
+        const isSpy = agent.id === selectedSpyAgent.id;
+        
+        // Only reset roundsAgoWasSpy for the new spy
+        if (isSpy) {
+          batch.update(agent.docRef, { 
+            codeWord: 'spy',
+            isSpy: true,
+            roundsAgoWasSpy: 1 // This agent was chosen as spy this round
+          });
+        } else {
+          // For all other agents, we need to:
+          // 1. If they have roundsAgoWasSpy, increment it by 1
+          // 2. If they don't have roundsAgoWasSpy, leave it undefined or set to null
+          
+          const currentRoundsAgo = agent.data.roundsAgoWasSpy;
+          batch.update(agent.docRef, { 
+            codeWord: evenCodeIcon,
+            isSpy: false,
+            roundsAgoWasSpy: currentRoundsAgo ? currentRoundsAgo + 1 : null
+          });
+        }
       });
 
       await batch.commit();
@@ -309,7 +352,7 @@ export default function AdminDashboard() {
                 {activeAgents.map((agent) => (
                   <div
                     key={agent.agentId}
-                    className={`aspect-square flex items-center justify-center bg-zinc-50 border-zinc-200 `}
+                    className={`aspect-square flex items-center justify-center bg-zinc-50 border-zinc-200 ${agent.isSpy ? 'border-2 border-red-500' : 'border'}`}
                   >
                     <span className="font-mono text-sm text-zinc-900">{agent.agentId}</span>
                   </div>

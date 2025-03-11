@@ -33,6 +33,7 @@ export default function AgentPage({ params }: AgentPageProps) {
   
   // State declarations
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [agentName, setAgentName] = useState<string | null>(null);
   const [codeWord, setCodeWord] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,12 @@ export default function AgentPage({ params }: AgentPageProps) {
   const [isSpy, setIsSpy] = useState(false);
 
   useEffect(() => {
+    // Get agent name from localStorage
+    const storedName = localStorage.getItem('agentName');
+    if (storedName) {
+      setAgentName(storedName);
+    }
+
     // Set up real-time listener for settings
     const settingsRef = doc(db, "settings", "mainSettings");
     const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
@@ -99,6 +106,7 @@ export default function AgentPage({ params }: AgentPageProps) {
     try {
       await setDoc(agentRef, {
         agentId,
+        agentName: agentName, // Store the agent name
         codeWord: isSpy ? 'spy' : settings.commonCodeWord,
         isSpy
       }, { merge: true });
@@ -117,6 +125,7 @@ export default function AgentPage({ params }: AgentPageProps) {
     try {
       await setDoc(agentRef, {
         agentId,
+        agentName: agentName, // Store the agent name
         codeWord: isEven ? settings.evenCodeWord : settings.oddCodeWord,
         isSpy: false
       }, { merge: true });
@@ -201,6 +210,7 @@ export default function AgentPage({ params }: AgentPageProps) {
       // Create new agent entry
       await setDoc(agentRef, {
         agentId: formattedAgentId,
+        agentName: agentName, // Store the agent name
         codeWord: assignedCodeWord ?? null,
         isSpy: isSpyRole
       });
@@ -289,7 +299,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                   {getRoleDisplay()}
                 </span>
               </div>
-              <div className={`font-mono text-sm ${getTextColorClass()}`}>{agentId || '--'}</div>
+              <div className={`font-mono text-sm ${getTextColorClass()}`}>{agentName || agentId || '--'}</div>
             </div>
           </div>
 
@@ -319,9 +329,9 @@ export default function AgentPage({ params }: AgentPageProps) {
                   </div>
                 )}
                 
-                {/* Agent ID Display */}
+                {/* Agent Name Display */}
                 <div>
-                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_ID</div>
+                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_NAME</div>
                   <div className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${getBgClasses()} rounded-lg`}>
                     <div className={`absolute inset-0 ${
                       isSpy ? 'bg-red-100' :
@@ -329,7 +339,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                       isBlueSpymaster ? 'bg-blue-100' :
                       'bg-gray-100'
                     } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
-                    <span className="relative">{agentId}</span>
+                    <span className="relative">{agentName || agentId}</span>
                   </div>
                 </div>
 
@@ -417,7 +427,7 @@ export default function AgentPage({ params }: AgentPageProps) {
           <div className={`border-t ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex justify-between items-center text-xs font-mono text-gray-500">
               <span>SYSTEM_ID::{agentSlug}</span>
-              <span>{getRoleDisplay()}{agentId ? `::${agentId}` : ''}</span>
+              <span>{getRoleDisplay()}{agentName ? `::${agentName}` : ''}</span>
             </div>
           </div>
         </div>
