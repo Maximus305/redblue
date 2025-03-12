@@ -1,5 +1,5 @@
-"use client"
-import React, { useState, useEffect, use } from 'react';
+"use client";
+import React, { useState, useEffect, use } from "react";
 import { Shield, Key, Loader2, Crown, AlertCircle, Eye } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import {
@@ -27,6 +27,15 @@ interface SettingsData {
   spyAgent?: string;
 }
 
+/** Helper function to treat the slug as "even" or "odd" by summing ASCII codes. */
+function isSlugEven(slug: string): boolean {
+  let sum = 0;
+  for (let i = 0; i < slug.length; i++) {
+    sum += slug.charCodeAt(i);
+  }
+  return sum % 2 === 0;
+}
+
 export default function AgentPage({ params }: AgentPageProps) {
   const resolvedParams = use(params);
   const { agentSlug } = resolvedParams;
@@ -35,7 +44,7 @@ export default function AgentPage({ params }: AgentPageProps) {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentName, setAgentName] = useState<string | null>(null);
   const [codeWord, setCodeWord] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showContent, setShowContent] = useState(false);
   const [isSpymaster, setIsSpymaster] = useState<{
@@ -63,8 +72,6 @@ export default function AgentPage({ params }: AgentPageProps) {
         if (currentGameMode === 'spy') {
           setIsSpy(agentSlug === settings.spyAgent);
           setIsSpymaster({ isRed: false, isBlue: false });
-          
-          // Update agent's code word if game mode changes to spy
           updateAgentForSpyMode(settings);
         } else {
           setIsSpy(false);
@@ -72,7 +79,6 @@ export default function AgentPage({ params }: AgentPageProps) {
             isRed: agentSlug === settings.redSpymaster,
             isBlue: agentSlug === settings.blueSpymaster
           });
-          // Update agent's code word for team mode
           updateAgentForTeamMode(settings);
         }
       }
@@ -85,6 +91,10 @@ export default function AgentPage({ params }: AgentPageProps) {
         const data = snapshot.data();
         setAgentId(data.agentId ?? null);
         setCodeWord(data.codeWord ?? null);
+        setLoading(false);
+      } else {
+        // If agent doesn't exist yet, automatically request access
+        handleGetCodeWord();
       }
     });
 
@@ -101,14 +111,14 @@ export default function AgentPage({ params }: AgentPageProps) {
     if (!agentId) return;
 
     const agentRef = doc(db, "agents", agentSlug);
-    const isSpy = agentSlug === settings.spyAgent;
+    const userIsSpy = agentSlug === settings.spyAgent;
     
     try {
       await setDoc(agentRef, {
         agentId,
-        agentName: agentName, // Store the agent name
-        codeWord: isSpy ? 'spy' : settings.commonCodeWord,
-        isSpy
+        agentName,
+        codeWord: userIsSpy ? 'spy' : settings.commonCodeWord,
+        isSpy: userIsSpy
       }, { merge: true });
     } catch (error) {
       console.error('Error updating agent for spy mode:', error);
@@ -119,14 +129,21 @@ export default function AgentPage({ params }: AgentPageProps) {
     if (!agentId) return;
 
     const agentRef = doc(db, "agents", agentSlug);
-    const agentNumber = parseInt(agentSlug);
-    const isEven = agentNumber % 2 === 0;
-    
+    // For non-spy game, check if user is red or blue spymaster, or a regular agent
+    const isRed = agentSlug === settings.redSpymaster;
+    const isBlue = agentSlug === settings.blueSpymaster;
+    const agentIsEven = isSlugEven(agentSlug);
+
+    let assignedCodeWord = null;
+    if (isRed) assignedCodeWord = settings.oddCodeWord;
+    else if (isBlue) assignedCodeWord = settings.evenCodeWord;
+    else assignedCodeWord = agentIsEven ? settings.evenCodeWord : settings.oddCodeWord;
+
     try {
       await setDoc(agentRef, {
         agentId,
-        agentName: agentName, // Store the agent name
-        codeWord: isEven ? settings.evenCodeWord : settings.oddCodeWord,
+        agentName,
+        codeWord: assignedCodeWord,
         isSpy: false
       }, { merge: true });
     } catch (error) {
@@ -139,30 +156,25 @@ export default function AgentPage({ params }: AgentPageProps) {
       setLoading(true);
       setError(null);
 
-      const agentNumber = parseInt(agentSlug);
-      if (isNaN(agentNumber)) {
-        setError('Invalid agent number.');
-        return;
-      }
-
-      const formattedAgentId = agentNumber < 10 ? `0${agentNumber}` : `${agentNumber}`;
       const agentRef = doc(db, "agents", agentSlug);
-      
-      // Check if agent already exists
       const agentSnap = await getDoc(agentRef);
+
+      // If agent already exists, just load it
       if (agentSnap.exists()) {
         const data = agentSnap.data();
         setAgentId(data.agentId);
         setCodeWord(data.codeWord);
+        setLoading(false);
         return;
       }
 
-      // Get settings
+      // Otherwise, create a new record for this agent
       const settingsRef = doc(db, "settings", "mainSettings");
       const settingsSnap = await getDoc(settingsRef);
 
       if (!settingsSnap.exists()) {
         setError('System not initialized. Contact administrator.');
+        setLoading(false);
         return;
       }
 
@@ -170,51 +182,47 @@ export default function AgentPage({ params }: AgentPageProps) {
       const currentGameMode = settingsData.gameMode || 'teams';
       setGameMode(currentGameMode);
 
-      let assignedCodeWord;
+      let assignedCodeWord = null;
       let isSpyRole = false;
 
       if (currentGameMode === 'spy') {
-        // Spy game mode logic
+        // Spy logic
         if (agentSlug === settingsData.spyAgent) {
           assignedCodeWord = 'spy';
           isSpyRole = true;
         } else {
           assignedCodeWord = settingsData.commonCodeWord;
         }
-        setIsSpy(isSpyRole);
       } else {
-        // Teams game mode logic
-        const isFirstAgent = agentNumber === 1;
-        const isSecondAgent = agentNumber === 2;
-        const noRedSpymaster = !settingsData.redSpymaster;
-        const noBlueSpymaster = !settingsData.blueSpymaster;
-
-        if (isFirstAgent && noRedSpymaster) {
-          // First agent becomes red spymaster
-          await setDoc(settingsRef, { ...settingsData, redSpymaster: agentSlug }, { merge: true });
+        // Teams logic
+        // If there's no red spymaster, assign red spymaster to this slug
+        if (!settingsData.redSpymaster) {
           assignedCodeWord = settingsData.oddCodeWord;
+          await setDoc(settingsRef, { ...settingsData, redSpymaster: agentSlug }, { merge: true });
           setIsSpymaster({ isRed: true, isBlue: false });
-        } else if (isSecondAgent && noBlueSpymaster) {
-          // Second agent becomes blue spymaster
-          await setDoc(settingsRef, { ...settingsData, blueSpymaster: agentSlug }, { merge: true });
+        } 
+        // Else if there's no blue spymaster, assign blue spymaster to this slug
+        else if (!settingsData.blueSpymaster) {
           assignedCodeWord = settingsData.evenCodeWord;
+          await setDoc(settingsRef, { ...settingsData, blueSpymaster: agentSlug }, { merge: true });
           setIsSpymaster({ isRed: false, isBlue: true });
         } else {
-          // Regular agent assignment
-          const isEven = agentNumber % 2 === 0;
-          assignedCodeWord = isEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
-          setIsSpymaster({ isRed: false, isBlue: false });
+          // Normal agent assignment
+          const agentIsEven = isSlugEven(agentSlug);
+          assignedCodeWord = agentIsEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
         }
       }
 
       // Create new agent entry
+      const formattedId = agentSlug; // No numeric formatting required now
       await setDoc(agentRef, {
-        agentId: formattedAgentId,
-        agentName: agentName, // Store the agent name
+        agentId: formattedId,
+        agentName,
         codeWord: assignedCodeWord ?? null,
         isSpy: isSpyRole
       });
-      setAgentId(formattedAgentId ?? null);
+
+      setAgentId(formattedId);
       setCodeWord(assignedCodeWord ?? null);
     } catch (error) {
       console.error('Error getting access code:', error);
@@ -264,21 +272,24 @@ export default function AgentPage({ params }: AgentPageProps) {
       {/* Background Pattern */}
       {(isAnySpymaster || isSpy) && (
         <div className="absolute inset-0">
-          <div className={`absolute inset-0 ${
-            isSpy ? 'bg-red-100/30' :
-            isRedSpymaster ? 'bg-red-100/30' : 
-            'bg-blue-100/30'
-          }`}>
-            <div className={`absolute inset-0 opacity-10`}
-                 style={{
-                   backgroundImage: `repeating-linear-gradient(
-                     45deg,
-                     ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
-                     ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
-                     transparent 1px,
-                     transparent 60px
-                   )`
-                 }}
+          <div
+            className={`absolute inset-0 ${
+              isSpy ? 'bg-red-100/30'
+            : isRedSpymaster ? 'bg-red-100/30'
+            : 'bg-blue-100/30'
+            }`}
+          >
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage: `repeating-linear-gradient(
+                  45deg,
+                  ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
+                  ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
+                  transparent 1px,
+                  transparent 60px
+                )`
+              }}
             />
           </div>
         </div>
@@ -299,13 +310,14 @@ export default function AgentPage({ params }: AgentPageProps) {
                   {getRoleDisplay()}
                 </span>
               </div>
-              <div className={`font-mono text-sm ${getTextColorClass()}`}>{agentName || agentId || '--'}</div>
+              <div className={`font-mono text-sm ${getTextColorClass()}`}>
+                {agentName || agentId || '--'}
+              </div>
             </div>
           </div>
 
           {/* Main Content */}
           <div className="p-8 relative">
-            {/* Error Message */}
             {error && (
               <Alert variant="destructive" className="mb-6">
                 <AlertCircle className="h-4 w-4" />
@@ -313,32 +325,36 @@ export default function AgentPage({ params }: AgentPageProps) {
               </Alert>
             )}
 
-            {agentId && codeWord ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+                <div className="text-zinc-600 font-mono">ACCESSING SYSTEM...</div>
+              </div>
+            ) : agentId && codeWord ? (
               <div className="space-y-8">
-                {/* Role Badge */}
                 {(isAnySpymaster || isSpy) && (
-                  <div className={`p-3 ${getBgClasses()} ${getTextColorClass()} ${getBorderColorClass()} border rounded-md flex items-center gap-2`}>
-                    {isSpy ? (
-                      <Eye className="w-5 h-5" />
-                    ) : (
-                      <Crown className="w-5 h-5" />
-                    )}
-                    <span className="font-mono text-sm">
-                      {getRoleDisplay()}
-                    </span>
+                  <div
+                    className={`p-3 ${getBgClasses()} ${getTextColorClass()} ${getBorderColorClass()} border rounded-md flex items-center gap-2`}
+                  >
+                    {isSpy ? <Eye className="w-5 h-5" /> : <Crown className="w-5 h-5" />}
+                    <span className="font-mono text-sm">{getRoleDisplay()}</span>
                   </div>
                 )}
                 
                 {/* Agent Name Display */}
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_NAME</div>
-                  <div className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${getBgClasses()} rounded-lg`}>
-                    <div className={`absolute inset-0 ${
-                      isSpy ? 'bg-red-100' :
-                      isRedSpymaster ? 'bg-red-100' :
-                      isBlueSpymaster ? 'bg-blue-100' :
-                      'bg-gray-100'
-                    } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                  <div
+                    className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${getBgClasses()} rounded-lg`}
+                  >
+                    <div
+                      className={`absolute inset-0 ${
+                        isSpy ? 'bg-red-100'
+                      : isRedSpymaster ? 'bg-red-100'
+                      : isBlueSpymaster ? 'bg-blue-100'
+                      : 'bg-gray-100'
+                      } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
+                    />
                     <span className="relative">{agentName || agentId}</span>
                   </div>
                 </div>
@@ -349,20 +365,24 @@ export default function AgentPage({ params }: AgentPageProps) {
                     {isSpy ? 'SPY STATUS' : 'CODE SIGN'}
                   </div>
                   <div className="flex justify-center">
-                    <div className={`${getBgClasses()} border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}>
-                      <div className={`absolute inset-0 ${
-                        isSpy ? 'bg-red-100' :
-                        isRedSpymaster ? 'bg-red-100' :
-                        isBlueSpymaster ? 'bg-blue-100' :
-                        'bg-gray-100'
-                      } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
+                    <div
+                      className={`${getBgClasses()} border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}
+                    >
+                      <div
+                        className={`absolute inset-0 ${
+                          isSpy ? 'bg-red-100'
+                        : isRedSpymaster ? 'bg-red-100'
+                        : isBlueSpymaster ? 'bg-blue-100'
+                        : 'bg-gray-100'
+                        } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
+                      />
                       {gameMode === 'spy' && isSpy ? (
                         <div className="text-6xl font-mono text-red-600">SPY</div>
                       ) : (
                         <IconForWord
-                        word={codeWord} 
+                          word={codeWord}
                           size={300}
-                          className={getTextColorClass()} 
+                          className={getTextColorClass()}
                         />
                       )}
                     </div>
@@ -370,28 +390,14 @@ export default function AgentPage({ params }: AgentPageProps) {
                 </div>
               </div>
             ) : (
-              // Request Access Button
-              <button
-                onClick={handleGetCodeWord}
-                disabled={loading}
-                className={`w-full border ${getBorderColorClass()} p-4 font-mono ${getTextColorClass()} 
-                         hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed 
-                         transition-colors relative group rounded-lg ${getBgClasses()}`}
-              >
-                <div className="relative flex items-center justify-center space-x-2">
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>PROCESSING...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Key className="w-5 h-5" />
-                      <span>REQUEST ACCESS</span>
-                    </>
-                  )}
+              <div className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                <div className="text-zinc-600 font-mono text-center">
+                  SYSTEM ACCESS ERROR
+                  <br />
+                  <span className="text-sm mt-2 block">Please refresh or return to the home page</span>
                 </div>
-              </button>
+              </div>
             )}
 
             {/* Spy Gallery - Only shown to spies */}
@@ -406,15 +412,17 @@ export default function AgentPage({ params }: AgentPageProps) {
                     'Hammer', 'Lantern', 'Lock', 'Ring',
                     'Rocket', 'Car', 'Hack', 'Key'
                   ].map((word) => (
-                    <div 
+                    <div
                       key={word}
                       className={`${getBgClasses()} border ${getBorderColorClass()} p-4 rounded-lg aspect-square flex items-center justify-center relative group`}
                     >
-                      <div className={`absolute inset-0 bg-red-100 opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`} />
-                      <IconForWord 
-                        word={word} 
+                      <div
+                        className={`absolute inset-0 bg-red-100 opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
+                      />
+                      <IconForWord
+                        word={word}
                         size={80}
-                        className={getTextColorClass()} 
+                        className={getTextColorClass()}
                       />
                     </div>
                   ))}
