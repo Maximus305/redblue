@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, use } from "react";
-import { Shield, Key, Loader2, Crown, AlertCircle, Eye } from 'lucide-react';
+import { Shield, Loader2, Crown, AlertCircle, Eye } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import {
   doc,

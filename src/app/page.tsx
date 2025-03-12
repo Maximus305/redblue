@@ -39,7 +39,7 @@ const AgentNav = () => {
         <div className="absolute inset-0">
           {[...Array(10)].map((_, i) => (
             <div
-              
+              key={i} // Added key prop to fix the error
               className="absolute w-full h-px bg-black/5"
               style={{ top: `${i * 10}%`, transform: `rotate(${i * 5}deg)` }}
             />
