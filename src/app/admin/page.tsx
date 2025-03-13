@@ -28,7 +28,14 @@ interface Agent {
   data: AgentData;
 }
 
-export default function AdminDashboard() {
+interface AdminDashboardProps {
+  params: {
+    roomId: string;
+  };
+}
+
+export default function AdminDashboard({ params }: AdminDashboardProps) {
+  const { roomId } = params;
   const [activeAgents, setActiveAgents] = useState<AgentData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +50,8 @@ export default function AdminDashboard() {
 
   const fetchGameMode = async () => {
     try {
-      const settingsSnap = await getDocs(collection(db, "settings"));
+      const settingsDoc = doc(db, "rooms", roomId, "settings", "mainSettings");
+      const settingsSnap = await getDocs(collection(db, "rooms", roomId, "settings"));
       if (settingsSnap.docs.length > 0) {
         const settings = settingsSnap.docs[0].data();
         setGameMode(settings.gameMode || 'teams');
@@ -55,7 +63,7 @@ export default function AdminDashboard() {
 
   const fetchAdminData = async () => {
     try {
-      const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agentsSnapshot = await getDocs(collection(db, "rooms", roomId, "agents"));
       const agentData = agentsSnapshot.docs
         .map(doc => doc.data() as AgentData)
         .sort((a, b) => a.agentId.localeCompare(b.agentId));
@@ -72,10 +80,10 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       const { evenCodeIcon, oddCodeIcon } = getRandomIcons();
-      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
       
       // Get all agents
-      const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agentsSnapshot = await getDocs(collection(db, "rooms", roomId, "agents"));
       const agents = agentsSnapshot.docs.map(doc => ({
         docRef: doc.ref,
         id: doc.id,
@@ -84,6 +92,13 @@ export default function AdminDashboard() {
 
       // First select spymasters randomly
       const availableAgents = [...agents];
+      
+      if (availableAgents.length < 2) {
+        setError('Need at least 2 agents to start team mode');
+        setLoading(false);
+        return;
+      }
+
       const randomRedSpymaster = availableAgents.splice(Math.floor(Math.random() * availableAgents.length), 1)[0];
       const randomBlueSpymaster = availableAgents.splice(Math.floor(Math.random() * availableAgents.length), 1)[0];
 
@@ -112,8 +127,8 @@ export default function AdminDashboard() {
 
       // Update remaining agents
       availableAgents.forEach((agent: Agent) => {
-        const agentNumber = parseInt(agent.id);
-        const isEvenAgent = agentNumber % 2 === 0;
+        const agentSlug = agent.id;
+        const isEvenAgent = agentSlug.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 === 0;
         const codeWord = isEvenAgent ? evenCodeIcon : oddCodeIcon;
         
         batch.update(agent.docRef, { 
@@ -138,10 +153,10 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       const { evenCodeIcon } = getRandomIcons(); // We'll use this as the common image
-      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
       
       // Get all agents
-      const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agentsSnapshot = await getDocs(collection(db, "rooms", roomId, "agents"));
       const agents = agentsSnapshot.docs.map(doc => ({
         docRef: doc.ref,
         id: doc.id,
@@ -245,10 +260,10 @@ export default function AdminDashboard() {
       setLoading(true);
   
       // Delete all existing agents
-      const agentsSnapshot = await getDocs(collection(db, "agents"));
+      const agentsSnapshot = await getDocs(collection(db, "rooms", roomId, "agents"));
       const batch = writeBatch(db);
       agentsSnapshot.docs.forEach(agentDoc => {
-        batch.delete(doc(db, "agents", agentDoc.id));
+        batch.delete(doc(db, "rooms", roomId, "agents", agentDoc.id));
       });
       if (agentsSnapshot.docs.length > 0) {
         await batch.commit();
@@ -256,7 +271,7 @@ export default function AdminDashboard() {
   
       // Generate new code words for team mode
       const { evenCodeIcon, oddCodeIcon } = getRandomIcons();
-      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
   
       // Reset settings to default team mode
       await setDoc(settingsRef, {
@@ -315,7 +330,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between bg-zinc-100 p-6 border border-zinc-200">
           <div className="flex items-center gap-3">
             <Terminal className="h-5 w-5 text-red-600" />
-            <h1 className="text-xl font-mono tracking-tight text-zinc-900">SYSTEM CONTROL</h1>
+            <h1 className="text-xl font-mono tracking-tight text-zinc-900">ROOM CONTROL: {roomId}</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm font-mono text-zinc-600">{getGameModeDisplay()}</span>
@@ -409,7 +424,7 @@ export default function AdminDashboard() {
             <div className="font-mono text-sm space-y-1">
               <div className="flex items-center gap-2">
                 <span className="text-red-600">{">"}</span>
-                <span className="text-zinc-600">System initialized</span>
+                <span className="text-zinc-600">Room initialized: {roomId}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-red-600">{">"}</span>

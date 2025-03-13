@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AgentPageProps {
   params: Promise<{
+    roomId: string;
     agentSlug: string;
   }>;
 }
@@ -38,7 +39,7 @@ function isSlugEven(slug: string): boolean {
 
 export default function AgentPage({ params }: AgentPageProps) {
   const resolvedParams = use(params);
-  const { agentSlug } = resolvedParams;
+  const { roomId, agentSlug } = resolvedParams;
   
   // State declarations
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -61,8 +62,8 @@ export default function AgentPage({ params }: AgentPageProps) {
       setAgentName(storedName);
     }
 
-    // Set up real-time listener for settings
-    const settingsRef = doc(db, "settings", "mainSettings");
+    // Set up real-time listener for settings - now using roomId in the path
+    const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
     const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
       if (snapshot.exists()) {
         const settings = snapshot.data() as SettingsData;
@@ -84,8 +85,8 @@ export default function AgentPage({ params }: AgentPageProps) {
       }
     });
 
-    // Set up real-time listener for agent data
-    const agentRef = doc(db, "agents", agentSlug);
+    // Set up real-time listener for agent data - now using roomId in the path
+    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
     const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -105,12 +106,12 @@ export default function AgentPage({ params }: AgentPageProps) {
       unsubscribeSettings();
       unsubscribeAgent();
     };
-  }, [agentSlug]);
+  }, [agentSlug, roomId]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
     if (!agentId) return;
 
-    const agentRef = doc(db, "agents", agentSlug);
+    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
     const userIsSpy = agentSlug === settings.spyAgent;
     
     try {
@@ -128,7 +129,7 @@ export default function AgentPage({ params }: AgentPageProps) {
   const updateAgentForTeamMode = async (settings: SettingsData) => {
     if (!agentId) return;
 
-    const agentRef = doc(db, "agents", agentSlug);
+    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
     // For non-spy game, check if user is red or blue spymaster, or a regular agent
     const isRed = agentSlug === settings.redSpymaster;
     const isBlue = agentSlug === settings.blueSpymaster;
@@ -156,7 +157,7 @@ export default function AgentPage({ params }: AgentPageProps) {
       setLoading(true);
       setError(null);
 
-      const agentRef = doc(db, "agents", agentSlug);
+      const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
       const agentSnap = await getDoc(agentRef);
 
       // If agent already exists, just load it
@@ -169,11 +170,11 @@ export default function AgentPage({ params }: AgentPageProps) {
       }
 
       // Otherwise, create a new record for this agent
-      const settingsRef = doc(db, "settings", "mainSettings");
+      const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
       const settingsSnap = await getDoc(settingsRef);
 
       if (!settingsSnap.exists()) {
-        setError('System not initialized. Contact administrator.');
+        setError('Room not initialized. Contact administrator.');
         setLoading(false);
         return;
       }
@@ -214,7 +215,7 @@ export default function AgentPage({ params }: AgentPageProps) {
       }
 
       // Create new agent entry
-      const formattedId = agentSlug; // No numeric formatting required now
+      const formattedId = agentSlug;
       await setDoc(agentRef, {
         agentId: formattedId,
         agentName,
@@ -434,7 +435,7 @@ export default function AgentPage({ params }: AgentPageProps) {
           {/* Footer Bar */}
           <div className={`border-t ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex justify-between items-center text-xs font-mono text-gray-500">
-              <span>SYSTEM_ID::{agentSlug}</span>
+              <span>ROOM::{roomId}::AGENT::{agentSlug}</span>
               <span>{getRoleDisplay()}{agentName ? `::${agentName}` : ''}</span>
             </div>
           </div>
