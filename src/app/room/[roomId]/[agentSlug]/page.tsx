@@ -364,7 +364,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
             
             <div className="bg-white p-4 rounded-lg shadow-md mb-6">
               <QRCodeSVG 
-                value={`https://redblue-ten.vercel.app/${roomId}`}
+                value={`redblue-ten.vercel.app/${roomId}`}
                 size={240}
                 level="M"
                 className="mx-auto"
