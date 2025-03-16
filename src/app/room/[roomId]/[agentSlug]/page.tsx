@@ -10,6 +10,8 @@ import {
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useRouter } from "next/navigation";
+import { QRCodeSVG } from 'qrcode.react';
 
 interface AgentPageProps {
   params: Promise<{
@@ -26,9 +28,15 @@ interface SettingsData {
   gameMode?: 'teams' | 'spy';
   commonCodeWord?: string;
   spyAgent?: string;
+  spyAgents?: string[];
+  gameStarted?: boolean;
 }
 
-/** Helper function to treat the slug as "even" or "odd" by summing ASCII codes. */
+interface RoomInfo {
+  active: boolean;
+  // Add other fields you expect in the room document
+}
+
 function isSlugEven(slug: string): boolean {
   let sum = 0;
   for (let i = 0; i < slug.length; i++) {
@@ -37,11 +45,11 @@ function isSlugEven(slug: string): boolean {
   return sum % 2 === 0;
 }
 
-export default function AgentPage({ params }: AgentPageProps) {
+export default function RoomAgentPage({ params }: AgentPageProps) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const { roomId, agentSlug } = resolvedParams;
   
-  // State declarations
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentName, setAgentName] = useState<string | null>(null);
   const [codeWord, setCodeWord] = useState<string | null>(null);
@@ -54,83 +62,144 @@ export default function AgentPage({ params }: AgentPageProps) {
   }>({ isRed: false, isBlue: false });
   const [gameMode, setGameMode] = useState<'teams' | 'spy'>('teams');
   const [isSpy, setIsSpy] = useState(false);
+  const [, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [gameStarted, setGameStarted] = useState(false);
+  
+  const allCodeWords = [
+    'Atlas', 'Balloon', 'Bamboo', 'Basket',
+    'Bell', 'Boat', 'Bullet', 'Camera',
+    'Castle', 'Chair', 'Clock', 'Diamond',
+    'Hammer', 'Lantern', 'Lock', 'Ring',
+    'Rocket', 'Car', 'Hack', 'Key',
+    'Bike', 'Gun', 'Rubiks'
+  ];
 
   useEffect(() => {
-    // Get agent name from localStorage
     const storedName = localStorage.getItem('agentName');
     if (storedName) {
       setAgentName(storedName);
     }
 
-    // Set up real-time listener for settings - now using roomId in the path
-    const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
-    const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const settings = snapshot.data() as SettingsData;
-        const currentGameMode = settings.gameMode || 'teams';
-        setGameMode(currentGameMode);
+    const checkRoom = async () => {
+      try {
+        const roomRef = doc(db, "rooms", roomId);
+        const roomSnap = await getDoc(roomRef);
         
-        if (currentGameMode === 'spy') {
-          setIsSpy(agentSlug === settings.spyAgent);
-          setIsSpymaster({ isRed: false, isBlue: false });
-          updateAgentForSpyMode(settings);
-        } else {
-          setIsSpy(false);
-          setIsSpymaster({
-            isRed: agentSlug === settings.redSpymaster,
-            isBlue: agentSlug === settings.blueSpymaster
-          });
-          updateAgentForTeamMode(settings);
+        if (!roomSnap.exists()) {
+          setError("Room not found");
+          setLoading(false);
+          return false;
         }
-      }
-    });
-
-    // Set up real-time listener for agent data - now using roomId in the path
-    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
-    const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setAgentId(data.agentId ?? null);
-        setCodeWord(data.codeWord ?? null);
+        
+        const roomData = roomSnap.data() as RoomInfo;
+        setRoomInfo(roomData);
+        
+        if (!roomData.active) {
+          setError("This room is no longer active");
+          setLoading(false);
+          return false;
+        }
+        
+        return true;
+      } catch (error) {
+        console.error("Error checking room:", error);
+        setError("Failed to access room");
         setLoading(false);
-      } else {
-        // If agent doesn't exist yet, automatically request access
-        handleGetCodeWord();
+        return false;
       }
-    });
-
-    setTimeout(() => setShowContent(true), 100);
-
-    // Cleanup listeners on unmount
-    return () => {
-      unsubscribeSettings();
-      unsubscribeAgent();
     };
-  }, [agentSlug, roomId]);
+
+    const initializeAgent = async () => {
+      const roomValid = await checkRoom();
+      if (!roomValid) return;
+
+      const settingsRef = doc(db, "settings", roomId);
+      const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const settings = snapshot.data() as SettingsData;
+          const currentGameMode = settings.gameMode || 'teams';
+          setGameMode(currentGameMode);
+          
+          setGameStarted(settings.gameStarted === true);
+          
+          if (currentGameMode === 'spy') {
+            const userIsSpy = agentSlug === settings.spyAgent || 
+                             (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
+            setIsSpy(userIsSpy);
+            setIsSpymaster({ isRed: false, isBlue: false });
+            updateAgentForSpyMode(settings);
+          } else {
+            setIsSpy(false);
+            setIsSpymaster({
+              isRed: agentSlug === settings.redSpymaster,
+              isBlue: agentSlug === settings.blueSpymaster
+            });
+            updateAgentForTeamMode(settings);
+          }
+        }
+      });
+
+      const agentKey = `${roomId}_${agentSlug}`;
+      const agentRef = doc(db, "agents", agentKey);
+      const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setAgentId(data.agentId ?? null);
+          setCodeWord(data.codeWord ?? null);
+          
+          if (data.isSpy !== undefined) {
+            setIsSpy(Boolean(data.isSpy));
+          }
+          
+          setLoading(false);
+        } else {
+          handleGetCodeWord();
+        }
+      });
+
+      setTimeout(() => setShowContent(true), 100);
+
+      return () => {
+        unsubscribeSettings();
+        unsubscribeAgent();
+      };
+    };
+
+    initializeAgent();
+  }, [roomId, agentSlug]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
-    if (!agentId) return;
+    if (!agentName) return;
 
-    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
-    const userIsSpy = agentSlug === settings.spyAgent;
+    const agentKey = `${roomId}_${agentSlug}`;
+    const agentRef = doc(db, "agents", agentKey);
+    
+    const userIsSpy = agentSlug === settings.spyAgent ||
+                     (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
     
     try {
       await setDoc(agentRef, {
-        agentId,
+        agentId: agentSlug,
         agentName,
+        roomId,
         codeWord: userIsSpy ? 'spy' : settings.commonCodeWord,
         isSpy: userIsSpy
       }, { merge: true });
+      
+      setIsSpy(userIsSpy);
+      if (userIsSpy) {
+        setCodeWord('spy');
+      }
     } catch (error) {
       console.error('Error updating agent for spy mode:', error);
     }
   };
 
   const updateAgentForTeamMode = async (settings: SettingsData) => {
-    if (!agentId) return;
+    if (!agentName) return;
 
-    const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
-    // For non-spy game, check if user is red or blue spymaster, or a regular agent
+    const agentKey = `${roomId}_${agentSlug}`;
+    const agentRef = doc(db, "agents", agentKey);
     const isRed = agentSlug === settings.redSpymaster;
     const isBlue = agentSlug === settings.blueSpymaster;
     const agentIsEven = isSlugEven(agentSlug);
@@ -142,8 +211,9 @@ export default function AgentPage({ params }: AgentPageProps) {
 
     try {
       await setDoc(agentRef, {
-        agentId,
+        agentId: agentSlug,
         agentName,
+        roomId,
         codeWord: assignedCodeWord,
         isSpy: false
       }, { merge: true });
@@ -157,10 +227,10 @@ export default function AgentPage({ params }: AgentPageProps) {
       setLoading(true);
       setError(null);
 
-      const agentRef = doc(db, "rooms", roomId, "agents", agentSlug);
+      const agentKey = `${roomId}_${agentSlug}`;
+      const agentRef = doc(db, "agents", agentKey);
       const agentSnap = await getDoc(agentRef);
 
-      // If agent already exists, just load it
       if (agentSnap.exists()) {
         const data = agentSnap.data();
         setAgentId(data.agentId);
@@ -169,8 +239,7 @@ export default function AgentPage({ params }: AgentPageProps) {
         return;
       }
 
-      // Otherwise, create a new record for this agent
-      const settingsRef = doc(db, "rooms", roomId, "settings", "mainSettings");
+      const settingsRef = doc(db, "settings", roomId);
       const settingsSnap = await getDoc(settingsRef);
 
       if (!settingsSnap.exists()) {
@@ -187,50 +256,53 @@ export default function AgentPage({ params }: AgentPageProps) {
       let isSpyRole = false;
 
       if (currentGameMode === 'spy') {
-        // Spy logic
-        if (agentSlug === settingsData.spyAgent) {
+        const isUserSpy = agentSlug === settingsData.spyAgent || 
+                         (settingsData.spyAgents !== undefined && settingsData.spyAgents.includes(agentSlug));
+        if (isUserSpy) {
           assignedCodeWord = 'spy';
           isSpyRole = true;
         } else {
           assignedCodeWord = settingsData.commonCodeWord;
         }
       } else {
-        // Teams logic
-        // If there's no red spymaster, assign red spymaster to this slug
         if (!settingsData.redSpymaster) {
           assignedCodeWord = settingsData.oddCodeWord;
           await setDoc(settingsRef, { ...settingsData, redSpymaster: agentSlug }, { merge: true });
           setIsSpymaster({ isRed: true, isBlue: false });
-        } 
-        // Else if there's no blue spymaster, assign blue spymaster to this slug
-        else if (!settingsData.blueSpymaster) {
+        } else if (!settingsData.blueSpymaster) {
           assignedCodeWord = settingsData.evenCodeWord;
           await setDoc(settingsRef, { ...settingsData, blueSpymaster: agentSlug }, { merge: true });
           setIsSpymaster({ isRed: false, isBlue: true });
         } else {
-          // Normal agent assignment
           const agentIsEven = isSlugEven(agentSlug);
           assignedCodeWord = agentIsEven ? settingsData.evenCodeWord : settingsData.oddCodeWord;
         }
       }
 
-      // Create new agent entry
-      const formattedId = agentSlug;
       await setDoc(agentRef, {
-        agentId: formattedId,
+        agentId: agentSlug,
         agentName,
+        roomId,
         codeWord: assignedCodeWord ?? null,
         isSpy: isSpyRole
       });
 
-      setAgentId(formattedId);
+      setAgentId(agentSlug);
       setCodeWord(assignedCodeWord ?? null);
+      
+      if (isSpyRole || assignedCodeWord === 'spy') {
+        setIsSpy(true);
+      }
     } catch (error) {
       console.error('Error getting access code:', error);
       setError('Unable to get access code. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const leaveRoom = () => {
+    router.push('/');
   };
 
   const isAnySpymaster = isSpymaster.isRed || isSpymaster.isBlue;
@@ -268,9 +340,56 @@ export default function AgentPage({ params }: AgentPageProps) {
     }
   };
 
+  if (!loading && !error && !gameStarted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-500 opacity-100">
+          <div className="border-b border-gray-200 p-4 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-lg">Waiting For Game Start</div>
+              <button 
+                onClick={leaveRoom}
+                className="text-sm text-zinc-500 hover:text-zinc-900"
+              >
+                EXIT
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-8 flex flex-col items-center">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold mb-2">Room ID: {roomId}</h2>
+              <p className="text-gray-600 mb-4">Waiting for the game host to start the game...</p>
+            </div>
+            
+            <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+              <QRCodeSVG 
+                value={`https://redblue-ten.vercel.app/${roomId}`}
+                size={240}
+                level="M"
+                className="mx-auto"
+              />
+            </div>
+            
+            <div className="text-center text-sm text-gray-500">
+              <p>Share this QR code with others to join this room</p>
+              <p className="font-mono mt-2">Web users: redblue-ten.vercel.app</p>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            <div className="flex justify-between items-center text-xs font-mono text-gray-500">
+              <span>ROOM::{roomId}</span>
+              <span>AGENT::{agentName || agentId || '--'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen ${getBgClasses()} flex items-center justify-center p-6 relative overflow-hidden`}>
-      {/* Background Pattern */}
       {(isAnySpymaster || isSpy) && (
         <div className="absolute inset-0">
           <div
@@ -298,7 +417,6 @@ export default function AgentPage({ params }: AgentPageProps) {
 
       <div className={`w-full max-w-2xl transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
         <div className="bg-white border border-gray-200 relative shadow-lg rounded-lg overflow-hidden">
-          {/* Header Bar */}
           <div className={`border-b ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -317,7 +435,6 @@ export default function AgentPage({ params }: AgentPageProps) {
             </div>
           </div>
 
-          {/* Main Content */}
           <div className="p-8 relative">
             {error && (
               <Alert variant="destructive" className="mb-6">
@@ -333,6 +450,16 @@ export default function AgentPage({ params }: AgentPageProps) {
               </div>
             ) : agentId && codeWord ? (
               <div className="space-y-8">
+                <div className="flex justify-between items-center">
+                  <div className="font-mono text-sm text-zinc-500">ROOM: {roomId}</div>
+                  <button 
+                    onClick={leaveRoom}
+                    className="text-sm text-zinc-500 hover:text-zinc-900"
+                  >
+                    LEAVE ROOM
+                  </button>
+                </div>
+                
                 {(isAnySpymaster || isSpy) && (
                   <div
                     className={`p-3 ${getBgClasses()} ${getTextColorClass()} ${getBorderColorClass()} border rounded-md flex items-center gap-2`}
@@ -342,7 +469,6 @@ export default function AgentPage({ params }: AgentPageProps) {
                   </div>
                 )}
                 
-                {/* Agent Name Display */}
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_NAME</div>
                   <div
@@ -360,7 +486,6 @@ export default function AgentPage({ params }: AgentPageProps) {
                   </div>
                 </div>
 
-                {/* Code Sign Display */}
                 <div>
                   <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>
                     {isSpy ? 'SPY STATUS' : 'CODE SIGN'}
@@ -377,7 +502,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                         : 'bg-gray-100'
                         } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
                       />
-                      {gameMode === 'spy' && isSpy ? (
+                      {isSpy || codeWord === 'spy' ? (
                         <div className="text-6xl font-mono text-red-600">SPY</div>
                       ) : (
                         <IconForWord
@@ -401,18 +526,11 @@ export default function AgentPage({ params }: AgentPageProps) {
               </div>
             )}
 
-            {/* Spy Gallery - Only shown to spies */}
-            {isSpy && agentId && (
+            {(isSpy || codeWord === 'spy') && (
               <div className="mt-12 space-y-4">
                 <div className={`font-mono text-lg ${getTextColorClass()}`}>ALL POSSIBLE CODE SIGNS</div>
                 <div className="grid grid-cols-4 gap-4">
-                  {[
-                    'Atlas', 'Balloon', 'Bamboo', 'Basket',
-                    'Bell', 'Boat', 'Bullet', 'Camera',
-                    'Castle', 'Chair', 'Clock', 'Diamond',
-                    'Hammer', 'Lantern', 'Lock', 'Ring',
-                    'Rocket', 'Car', 'Hack', 'Key'
-                  ].map((word) => (
+                  {allCodeWords.map((word) => (
                     <div
                       key={word}
                       className={`${getBgClasses()} border ${getBorderColorClass()} p-4 rounded-lg aspect-square flex items-center justify-center relative group`}
@@ -432,10 +550,9 @@ export default function AgentPage({ params }: AgentPageProps) {
             )}
           </div>
 
-          {/* Footer Bar */}
           <div className={`border-t ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
             <div className="flex justify-between items-center text-xs font-mono text-gray-500">
-              <span>ROOM::{roomId}::AGENT::{agentSlug}</span>
+              <span>ROOM::{roomId}</span>
               <span>{getRoleDisplay()}{agentName ? `::${agentName}` : ''}</span>
             </div>
           </div>

@@ -22,7 +22,10 @@ export const IMAGE_MAPPINGS: ImageMappingType = {
   'Rocket': '/images/rocket.png',
   'Car': '/images/car.png',
   'Hack': '/images/watch.png',
-  'Key': '/images/key.png'
+  'Key': '/images/key.png',
+  'Bike': '/images/bike.png',
+  'Gun': '/images/gun.png',
+  'Rubiks': '/images/rubiks.png'
 };
 
 export const ICON_WORDS = Object.keys(IMAGE_MAPPINGS);
