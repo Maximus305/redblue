@@ -139,10 +139,9 @@ export default function NameEntryPage() {
         // Continue anyway, this is not critical
       }
       
-      // Generate a unique agent slug based on name and timestamp
-      const timestamp = Date.now();
+      // Use only the sanitized name without appending a timestamp
       const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const agentSlug = `${sanitizedName}-${timestamp}`;
+      const agentSlug = sanitizedName;
       
       // Log the navigation we're about to do
       console.log("Navigating to:", `/room/${formattedRoomId}/${agentSlug}`);

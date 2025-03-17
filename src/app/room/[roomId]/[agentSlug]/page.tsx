@@ -1,12 +1,15 @@
 "use client";
 import React, { useState, useEffect, use } from "react";
-import { Shield, Loader2, Crown, AlertCircle, Eye } from 'lucide-react';
+import { Shield, Loader2, Crown, AlertCircle, Eye, ClipboardList, X } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import {
   doc,
   getDoc,
   setDoc,
-  onSnapshot
+  onSnapshot,
+  collection,
+  query,
+  getDocs
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,6 +40,12 @@ interface RoomInfo {
   // Add other fields you expect in the room document
 }
 
+interface PlayerScore {
+  agentId: string;
+  agentName: string;
+  score: number;
+}
+
 function isSlugEven(slug: string): boolean {
   let sum = 0;
   for (let i = 0; i < slug.length; i++) {
@@ -64,6 +73,9 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [isSpy, setIsSpy] = useState(false);
   const [, setRoomInfo] = useState<RoomInfo | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
+  const [showScores, setShowScores] = useState(false);
+  const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
+  const [loadingScores, setLoadingScores] = useState(false);
   
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket',
@@ -361,6 +373,40 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     }
   };
 
+  const fetchPlayerScores = async () => {
+    setLoadingScores(true);
+    try {
+      // Get all agents in the current room
+      const agentsQuery = query(collection(db, "agents"));
+      const agentSnapshots = await getDocs(agentsQuery);
+      
+      const roomScores: PlayerScore[] = [];
+      
+      agentSnapshots.forEach(doc => {
+        const data = doc.data();
+        // Only include agents from this room
+        if (data.roomId === roomId) {
+          roomScores.push({
+            agentId: data.agentId || doc.id,
+            agentName: data.agentName || data.agentId || doc.id,
+            score: data.score || 0
+          });
+        }
+      });
+      
+      setPlayerScores(roomScores);
+    } catch (error) {
+      console.error("Error fetching player scores:", error);
+    } finally {
+      setLoadingScores(false);
+    }
+  };
+
+  const handleShowScores = () => {
+    fetchPlayerScores();
+    setShowScores(true);
+  };
+
   const leaveRoom = () => {
     router.push('/');
   };
@@ -424,7 +470,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
             
             <div className="bg-white p-4 rounded-lg shadow-md mb-6">
               <QRCodeSVG 
-                value={`redblue-ten.vercel.app/${roomId}`}
+                value={`https://redblue-ten.vercel.app/${roomId}`}
                 size={240}
                 level="M"
                 className="mx-auto"
@@ -512,12 +558,21 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
               <div className="space-y-8">
                 <div className="flex justify-between items-center">
                   <div className="font-mono text-sm text-zinc-500">ROOM: {roomId}</div>
-                  <button 
-                    onClick={leaveRoom}
-                    className="text-sm text-zinc-500 hover:text-zinc-900"
-                  >
-                    LEAVE ROOM
-                  </button>
+                  <div className="flex space-x-4">
+                    <button 
+                      onClick={handleShowScores}
+                      className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      <span>VIEW SCORES</span>
+                    </button>
+                    <button 
+                      onClick={leaveRoom}
+                      className="text-sm text-zinc-500 hover:text-zinc-900"
+                    >
+                      LEAVE ROOM
+                    </button>
+                  </div>
                 </div>
                 
                 {(isAnySpymaster || isSpy) && (
@@ -618,6 +673,58 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Player Scores Modal */}
+      {showScores && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-mono font-bold">PLAYER SCORES</h3>
+              <button 
+                onClick={() => setShowScores(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {loadingScores ? (
+                <div className="flex justify-center items-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                </div>
+              ) : playerScores.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No player scores available
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {playerScores.map((player) => (
+                    <div 
+                      key={player.agentId}
+                      className="flex justify-between items-center p-3 bg-gray-50 rounded-md border border-gray-200"
+                    >
+                      <div className="font-medium">{player.agentName}</div>
+                      <div className="bg-gray-200 px-3 py-1 rounded-full font-mono">
+                        {player.score}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+              <button
+                onClick={() => setShowScores(false)}
+                className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
