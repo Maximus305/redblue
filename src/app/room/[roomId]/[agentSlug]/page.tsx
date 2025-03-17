@@ -62,7 +62,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   }>({ isRed: false, isBlue: false });
   const [gameMode, setGameMode] = useState<'teams' | 'spy'>('teams');
   const [isSpy, setIsSpy] = useState(false);
-  const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [, setRoomInfo] = useState<RoomInfo | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   
   const allCodeWords = [
