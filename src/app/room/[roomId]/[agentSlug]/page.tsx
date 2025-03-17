@@ -1,4 +1,3 @@
-"use client";
 import React, { useState, useEffect, use } from "react";
 import { Shield, Loader2, Crown, AlertCircle, Eye, ClipboardList, X } from 'lucide-react';
 import { db } from "@/lib/firebase";
@@ -9,13 +8,16 @@ import {
   onSnapshot,
   collection,
   query,
-  getDocs
+  getDocs,
+  where,
+  writeBatch
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from 'qrcode.react';
 
+// Type definitions
 interface AgentPageProps {
   params: Promise<{
     roomId: string;
@@ -44,7 +46,10 @@ interface PlayerScore {
   agentId: string;
   agentName: string;
   score: number;
+  isSwiftPlayer?: boolean;
+  platform?: string;
 }
+
 
 function isSlugEven(slug: string): boolean {
   let sum = 0;
@@ -85,6 +90,178 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     'Rocket', 'Car', 'Hack', 'Key',
     'Bike', 'Gun', 'Rubiks'
   ];
+  
+  // Player score functions
+  const fetchPlayerScores = async (): Promise<void> => {
+    setLoadingScores(true);
+    try {
+      // Get all agents in the current room
+      const agentsQuery = query(collection(db, "agents"));
+      const agentSnapshots = await getDocs(agentsQuery);
+      
+      const roomScores: PlayerScore[] = [];
+      let foundSwiftPlayer = false;
+      
+      agentSnapshots.forEach(doc => {
+        const data = doc.data();
+        // Only include agents from this room
+        if (data.roomId === roomId) {
+          // Special handling for Swift player (Agent01 with platform ios)
+          if (data.agentId === "Agent01" && data.platform === "ios") {
+            foundSwiftPlayer = true;
+            roomScores.push({
+              agentId: "Agent01",
+              agentName: data.agentName || "Player",
+              score: data.score || 0,
+              isSwiftPlayer: true,
+              platform: "ios"
+            });
+          } else if (doc.id === `${roomId}_Agent01` && !data.platform) {
+            // This could be a Swift player that doesn't have the platform field yet
+            foundSwiftPlayer = true;
+            roomScores.push({
+              agentId: "Agent01",
+              agentName: data.agentName || "Player",
+              score: data.score || 0,
+              isSwiftPlayer: true
+            });
+          } else {
+            // Regular web player
+            roomScores.push({
+              agentId: data.agentId || doc.id.replace(`${roomId}_`, ""),
+              agentName: data.agentName || data.agentId || doc.id.replace(`${roomId}_`, ""),
+              score: data.score || 0,
+              isSwiftPlayer: false
+            });
+          }
+        }
+      });
+      
+      // If we didn't find the Swift player but we should have one, look specifically for it
+      if (!foundSwiftPlayer) {
+        const swiftPlayerRef = doc(db, "agents", `${roomId}_Agent01`);
+        const swiftPlayerSnap = await getDoc(swiftPlayerRef);
+        
+        if (swiftPlayerSnap.exists()) {
+          const data = swiftPlayerSnap.data();
+          roomScores.push({
+            agentId: "Agent01",
+            agentName: data.agentName || "Player",
+            score: data.score || 0,
+            isSwiftPlayer: true,
+            platform: data.platform
+          });
+        }
+      }
+      
+      // Sort scores: Swift player first, then by score (highest first)
+      roomScores.sort((a, b) => {
+        // Swift player comes first
+        if (a.isSwiftPlayer && !b.isSwiftPlayer) return -1;
+        if (!a.isSwiftPlayer && b.isSwiftPlayer) return 1;
+        
+        // Then sort by score (highest first)
+        return b.score - a.score;
+      });
+      
+      setPlayerScores(roomScores);
+    } catch (error) {
+      console.error("Error fetching player scores:", error);
+    } finally {
+      setLoadingScores(false);
+    }
+  };
+  
+
+  // Update player score
+  const updatePlayerScore = async (agentId: string, agentName: string, newScore: number, isSwiftPlayer: boolean = false): Promise<void> => {
+    try {
+      // Prevent negative scores
+      if (newScore < 0) newScore = 0;
+      
+      // First update our local state
+      const updatedScores = playerScores.map(player => {
+        if ((isSwiftPlayer && player.isSwiftPlayer) || player.agentId === agentId) {
+          return { ...player, score: newScore };
+        }
+        return player;
+      });
+      
+      setPlayerScores(updatedScores);
+      
+      // Then update Firestore
+      let agentKey;
+      
+      if (isSwiftPlayer) {
+        // Special handling for Swift player
+        agentKey = `${roomId}_Agent01`;
+      } else {
+        // Normal handling for web players
+        agentKey = `${roomId}_${agentId}`;
+      }
+      
+      const agentRef = doc(db, "agents", agentKey);
+      await setDoc(agentRef, { score: newScore }, { merge: true });
+    } catch (error) {
+      console.error("Error updating score:", error);
+    }
+  };
+
+  // Increment player score
+  const incrementPlayerScore = async (agentId: string, agentName: string, isSwiftPlayer: boolean = false): Promise<void> => {
+    const player = playerScores.find(p => 
+      (isSwiftPlayer && p.isSwiftPlayer) || p.agentId === agentId
+    );
+    
+    if (player) {
+      const currentScore = player.score || 0;
+      await updatePlayerScore(agentId, agentName, currentScore + 1, isSwiftPlayer);
+    }
+  };
+  
+  // Function to decrement player score
+  const decrementPlayerScore = async (agentId: string, agentName: string, isSwiftPlayer: boolean = false): Promise<void> => {
+    const player = playerScores.find(p => 
+      (isSwiftPlayer && p.isSwiftPlayer) || p.agentId === agentId
+    );
+    
+    if (player) {
+      const currentScore = player.score || 0;
+      if (currentScore > 0) {
+        await updatePlayerScore(agentId, agentName, currentScore - 1, isSwiftPlayer);
+      }
+    }
+  };
+
+  // Reset all scores
+  const resetAllScores = async (): Promise<void> => {
+    try {
+      // Update all players in our local state
+      const resetScores = playerScores.map(player => ({
+        ...player,
+        score: 0
+      }));
+      
+      setPlayerScores(resetScores);
+      
+      // Get all agents in this room from Firestore
+      const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
+      const agentSnapshots = await getDocs(agentsQuery);
+      
+      // Create a batch to update all at once
+      const batch = writeBatch(db);
+      
+      // Reset score for all agents
+      agentSnapshots.forEach(document => {
+        batch.update(document.ref, { score: 0 });
+      });
+      
+      // Commit the batch
+      await batch.commit();
+    } catch (error) {
+      console.error("Error resetting scores:", error);
+    }
+  };
 
   useEffect(() => {
     // Load agent name from localStorage
@@ -373,35 +550,6 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     }
   };
 
-  const fetchPlayerScores = async () => {
-    setLoadingScores(true);
-    try {
-      // Get all agents in the current room
-      const agentsQuery = query(collection(db, "agents"));
-      const agentSnapshots = await getDocs(agentsQuery);
-      
-      const roomScores: PlayerScore[] = [];
-      
-      agentSnapshots.forEach(doc => {
-        const data = doc.data();
-        // Only include agents from this room
-        if (data.roomId === roomId) {
-          roomScores.push({
-            agentId: data.agentId || doc.id,
-            agentName: data.agentName || data.agentId || doc.id,
-            score: data.score || 0
-          });
-        }
-      });
-      
-      setPlayerScores(roomScores);
-    } catch (error) {
-      console.error("Error fetching player scores:", error);
-    } finally {
-      setLoadingScores(false);
-    }
-  };
-
   const handleShowScores = () => {
     fetchPlayerScores();
     setShowScores(true);
@@ -676,55 +824,112 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
 
       {/* Player Scores Modal */}
       {showScores && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-mono font-bold">PLAYER SCORES</h3>
-              <button 
-                onClick={() => setShowScores(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
+      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <h3 className="text-lg font-mono font-bold">PLAYER SCORES</h3>
+        <button 
+          onClick={() => setShowScores(false)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {loadingScores ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                </div>
-              ) : playerScores.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No player scores available
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {playerScores.map((player) => (
-                    <div 
-                      key={player.agentId}
-                      className="flex justify-between items-center p-3 bg-gray-50 rounded-md border border-gray-200"
-                    >
-                      <div className="font-medium">{player.agentName}</div>
-                      <div className="bg-gray-200 px-3 py-1 rounded-full font-mono">
-                        {player.score}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-              <button
-                onClick={() => setShowScores(false)}
-                className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+      <div className="p-4 max-h-96 overflow-y-auto">
+        {loadingScores ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
           </div>
-        </div>
-      )}
+        ) : playerScores.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No player scores available
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {playerScores.map((player) => (
+              <div 
+                key={player.agentId + (player.isSwiftPlayer ? '-swift' : '')}
+                className={`flex justify-between items-center p-3 rounded-md border ${
+                  player.isSwiftPlayer 
+                    ? 'bg-blue-50 border-blue-200' 
+                    : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="font-medium">
+                  {player.agentName}
+                  {player.isSwiftPlayer && (
+                    <span className="ml-2 text-xs text-blue-600 font-mono">(iOS)</span>
+                  )}
+                  {(isSpymaster.isRed && player.agentId === agentSlug) && (
+                    <span className="ml-2 text-xs text-red-600 font-mono">RED SPYMASTER</span>
+                  )}
+                  {(isSpymaster.isBlue && player.agentId === agentSlug) && (
+                    <span className="ml-2 text-xs text-blue-600 font-mono">BLUE SPYMASTER</span>
+                  )}
+                  {(isSpy && player.agentId === agentSlug) && (
+                    <span className="ml-2 text-xs text-red-600 font-mono">SPY</span>
+                  )}
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={() => decrementPlayerScore(player.agentId, player.agentName, player.isSwiftPlayer)}
+                    className={`p-1 rounded-full ${
+                      player.score <= 0 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                    disabled={player.score <= 0}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" 
+                         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                  </button>
+                  
+                  <div className={`px-3 py-1 rounded-full font-mono w-12 text-center ${
+                    player.isSwiftPlayer ? 'bg-blue-100' : 'bg-gray-200'
+                  }`}>
+                    {player.score}
+                  </div>
+                  
+                  <button 
+                    onClick={() => incrementPlayerScore(player.agentId, player.agentName, player.isSwiftPlayer)}
+                    className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" 
+                         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="16"></line>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex space-x-3">
+        <button
+          onClick={resetAllScores}
+          className="w-1/2 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors font-medium"
+        >
+          Reset All Scores
+        </button>
+        <button
+          onClick={() => setShowScores(false)}
+          className="w-1/2 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
