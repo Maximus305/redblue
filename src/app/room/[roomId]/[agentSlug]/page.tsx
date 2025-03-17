@@ -62,7 +62,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   }>({ isRed: false, isBlue: false });
   const [gameMode, setGameMode] = useState<'teams' | 'spy'>('teams');
   const [isSpy, setIsSpy] = useState(false);
-  const [, setRoomInfo] = useState<RoomInfo | null>(null);
+  const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
   
   const allCodeWords = [
@@ -75,9 +75,18 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   ];
 
   useEffect(() => {
-    const storedName = localStorage.getItem('agentName');
+    // Load agent name from localStorage
+    const storedName = localStorage.getItem(`agent_name_${roomId}_${agentSlug}`);
     if (storedName) {
       setAgentName(storedName);
+    } else {
+      // Try to get the generic agent name as fallback
+      const genericStoredName = localStorage.getItem('agentName');
+      if (genericStoredName) {
+        setAgentName(genericStoredName);
+        // Save it with the room-specific key for future use
+        localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, genericStoredName);
+      }
     }
 
     const checkRoom = async () => {
@@ -113,6 +122,28 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
       const roomValid = await checkRoom();
       if (!roomValid) return;
 
+      // First, check if we have agent data in Firestore
+      const agentKey = `${roomId}_${agentSlug}`;
+      const agentRef = doc(db, "agents", agentKey);
+      const agentSnap = await getDoc(agentRef);
+      
+      // If agent data exists, synchronize the local name with Firestore data
+      if (agentSnap.exists()) {
+        const data = agentSnap.data();
+        setAgentId(data.agentId ?? null);
+        setCodeWord(data.codeWord ?? null);
+        
+        if (data.agentName) {
+          setAgentName(data.agentName);
+          localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, data.agentName);
+        }
+        
+        if (data.isSpy !== undefined) {
+          setIsSpy(Boolean(data.isSpy));
+        }
+      }
+
+      // Set up settings listener
       const settingsRef = doc(db, "settings", roomId);
       const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -139,13 +170,18 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
         }
       });
 
-      const agentKey = `${roomId}_${agentSlug}`;
-      const agentRef = doc(db, "agents", agentKey);
+      // Set up agent listener
       const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
           setAgentId(data.agentId ?? null);
           setCodeWord(data.codeWord ?? null);
+          
+          // Update local storage with the latest agent name
+          if (data.agentName) {
+            setAgentName(data.agentName);
+            localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, data.agentName);
+          }
           
           if (data.isSpy !== undefined) {
             setIsSpy(Boolean(data.isSpy));
@@ -153,6 +189,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
           
           setLoading(false);
         } else {
+          // No agent document exists, create it
           handleGetCodeWord();
         }
       });
@@ -167,6 +204,22 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
 
     initializeAgent();
   }, [roomId, agentSlug]);
+
+  // Save agent name to both local storage and Firestore whenever it changes
+  useEffect(() => {
+    if (agentName && agentId) {
+      // Update the room-specific storage key
+      localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, agentName);
+      // Also update the generic key for backward compatibility
+      localStorage.setItem('agentName', agentName);
+      
+      // Update Firestore if we have an agent ID
+      const agentKey = `${roomId}_${agentSlug}`;
+      const agentRef = doc(db, "agents", agentKey);
+      setDoc(agentRef, { agentName }, { merge: true })
+        .catch(err => console.error("Error updating agent name:", err));
+    }
+  }, [agentName, agentId, roomId, agentSlug]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
     if (!agentName) return;
@@ -235,6 +288,13 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
         const data = agentSnap.data();
         setAgentId(data.agentId);
         setCodeWord(data.codeWord);
+        
+        // Make sure we update the agent name from Firestore if it exists
+        if (data.agentName) {
+          setAgentName(data.agentName);
+          localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, data.agentName);
+        }
+        
         setLoading(false);
         return;
       }
