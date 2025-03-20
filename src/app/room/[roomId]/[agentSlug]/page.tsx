@@ -1,3 +1,4 @@
+"use client"
 import React, { useState, useEffect, use } from "react";
 import { Shield, Loader2, Crown, AlertCircle, Eye, ClipboardList, X } from 'lucide-react';
 import { db } from "@/lib/firebase";
@@ -10,7 +11,8 @@ import {
   query,
   getDocs,
   where,
-  writeBatch
+  
+  
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -50,6 +52,34 @@ interface PlayerScore {
   platform?: string;
 }
 
+// Component for showing the "You've been removed" alert
+const RemovedAlert = ({ onClose }: { onClose: () => void }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
+        <div className="p-6">
+          <div className="flex items-center mb-4">
+            <AlertCircle className="w-6 h-6 text-red-500 mr-2" />
+            <h3 className="text-lg font-bold text-red-600">You&#39;ve been removed</h3>
+          </div>
+          
+          <p className="mb-6 text-gray-600">
+            You have been removed from the room by the host.
+          </p>
+          
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Return to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function isSlugEven(slug: string): boolean {
   let sum = 0;
@@ -81,6 +111,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [showScores, setShowScores] = useState(false);
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [loadingScores, setLoadingScores] = useState(false);
+  const [hasBeenRemoved, setHasBeenRemoved] = useState(false);
   
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket',
@@ -92,176 +123,110 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   ];
   
   // Player score functions
-  const fetchPlayerScores = async (): Promise<void> => {
-    setLoadingScores(true);
-    try {
-      // Get all agents in the current room
-      const agentsQuery = query(collection(db, "agents"));
-      const agentSnapshots = await getDocs(agentsQuery);
+  // Improved fetchPlayerScores function with better iOS player deduplication
+const fetchPlayerScores = async (): Promise<void> => {
+  setLoadingScores(true);
+  try {
+    // Get all agents in the current room
+    const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
+    const agentSnapshots = await getDocs(agentsQuery);
+    
+    const roomScores: PlayerScore[] = [];
+    const processedPlayerIds = new Set(); // Track processed player IDs to avoid duplicates
+    
+    // First find the iOS/Swift player specifically to avoid duplication
+    let iosPlayer: PlayerScore | null = null;
+    
+    // Look through all documents for iOS player first
+    agentSnapshots.forEach(doc => {
+      const data = doc.data();
       
-      const roomScores: PlayerScore[] = [];
-      let foundSwiftPlayer = false;
-      
-      agentSnapshots.forEach(doc => {
-        const data = doc.data();
-        // Only include agents from this room
-        if (data.roomId === roomId) {
-          // Special handling for Swift player (Agent01 with platform ios)
-          if (data.agentId === "Agent01" && data.platform === "ios") {
-            foundSwiftPlayer = true;
-            roomScores.push({
+      if (data.roomId === roomId) {
+        // Identify iOS player with various potential attributes
+        if (
+          (data.agentId === "Agent01" && data.platform === "ios") || 
+          (data.isSwiftPlayer === true) ||
+          (doc.id === `${roomId}_Agent01` && (data.platform === "ios"))
+        ) {
+          // Only create or update iOS player entry if we don't have one yet or this one has a higher score
+          if (!iosPlayer || (data.score > iosPlayer.score)) {
+            iosPlayer = {
               agentId: "Agent01",
-              agentName: data.agentName || "Player",
+              agentName: data.agentName || "iOS Player",
               score: data.score || 0,
               isSwiftPlayer: true,
               platform: "ios"
-            });
-          } else if (doc.id === `${roomId}_Agent01` && !data.platform) {
-            // This could be a Swift player that doesn't have the platform field yet
-            foundSwiftPlayer = true;
-            roomScores.push({
-              agentId: "Agent01",
-              agentName: data.agentName || "Player",
-              score: data.score || 0,
-              isSwiftPlayer: true
-            });
-          } else {
-            // Regular web player
-            roomScores.push({
-              agentId: data.agentId || doc.id.replace(`${roomId}_`, ""),
-              agentName: data.agentName || data.agentId || doc.id.replace(`${roomId}_`, ""),
-              score: data.score || 0,
-              isSwiftPlayer: false
-            });
+            };
           }
         }
-      });
+      }
+    });
+    
+    // If we found an iOS player, add it to the results and mark as processed
+    if (iosPlayer) {
+      roomScores.push(iosPlayer);
+      processedPlayerIds.add("Agent01");
+      processedPlayerIds.add(`${roomId}_Agent01`);
+    }
+    
+    // Now process all other players, skipping any we've already handled
+    agentSnapshots.forEach(doc => {
+      const data = doc.data();
       
-      // If we didn't find the Swift player but we should have one, look specifically for it
-      if (!foundSwiftPlayer) {
-        const swiftPlayerRef = doc(db, "agents", `${roomId}_Agent01`);
-        const swiftPlayerSnap = await getDoc(swiftPlayerRef);
+      // Only include agents from this room
+      if (data.roomId === roomId) {
+        // Get the player ID in a consistent format
+        const playerId = data.agentId || doc.id.replace(`${roomId}_`, "");
         
-        if (swiftPlayerSnap.exists()) {
-          const data = swiftPlayerSnap.data();
+        // Skip if we've already processed this player or it's the iOS player
+        if (!processedPlayerIds.has(playerId) && 
+            !processedPlayerIds.has(doc.id) && 
+            !processedPlayerIds.has(`${roomId}_${playerId}`)) {
+          
+          // Add to processed set
+          processedPlayerIds.add(playerId);
+          processedPlayerIds.add(`${roomId}_${playerId}`);
+          
+          // Regular web player
           roomScores.push({
-            agentId: "Agent01",
-            agentName: data.agentName || "Player",
+            agentId: playerId,
+            agentName: data.agentName || playerId,
             score: data.score || 0,
-            isSwiftPlayer: true,
-            platform: data.platform
+            isSwiftPlayer: false
           });
         }
       }
+    });
+    
+    // Sort scores: Swift player first, then by score (highest first)
+    roomScores.sort((a, b) => {
+      // Swift player comes first
+      if (a.isSwiftPlayer && !b.isSwiftPlayer) return -1;
+      if (!a.isSwiftPlayer && b.isSwiftPlayer) return 1;
       
-      // Sort scores: Swift player first, then by score (highest first)
-      roomScores.sort((a, b) => {
-        // Swift player comes first
-        if (a.isSwiftPlayer && !b.isSwiftPlayer) return -1;
-        if (!a.isSwiftPlayer && b.isSwiftPlayer) return 1;
-        
-        // Then sort by score (highest first)
-        return b.score - a.score;
-      });
-      
-      setPlayerScores(roomScores);
-    } catch (error) {
-      console.error("Error fetching player scores:", error);
-    } finally {
-      setLoadingScores(false);
-    }
-  };
+      // Then sort by score (highest first)
+      return b.score - a.score;
+    });
+    
+    setPlayerScores(roomScores);
+  } catch (error) {
+    console.error("Error fetching player scores:", error);
+  } finally {
+    setLoadingScores(false);
+  }
+};
   
+
+
 
   // Update player score
-  const updatePlayerScore = async (agentId: string, agentName: string, newScore: number, isSwiftPlayer: boolean = false): Promise<void> => {
-    try {
-      // Prevent negative scores
-      if (newScore < 0) newScore = 0;
-      
-      // First update our local state
-      const updatedScores = playerScores.map(player => {
-        if ((isSwiftPlayer && player.isSwiftPlayer) || player.agentId === agentId) {
-          return { ...player, score: newScore };
-        }
-        return player;
-      });
-      
-      setPlayerScores(updatedScores);
-      
-      // Then update Firestore
-      let agentKey;
-      
-      if (isSwiftPlayer) {
-        // Special handling for Swift player
-        agentKey = `${roomId}_Agent01`;
-      } else {
-        // Normal handling for web players
-        agentKey = `${roomId}_${agentId}`;
-      }
-      
-      const agentRef = doc(db, "agents", agentKey);
-      await setDoc(agentRef, { score: newScore }, { merge: true });
-    } catch (error) {
-      console.error("Error updating score:", error);
-    }
-  };
+  
 
   // Increment player score
-  const incrementPlayerScore = async (agentId: string, agentName: string, isSwiftPlayer: boolean = false): Promise<void> => {
-    const player = playerScores.find(p => 
-      (isSwiftPlayer && p.isSwiftPlayer) || p.agentId === agentId
-    );
-    
-    if (player) {
-      const currentScore = player.score || 0;
-      await updatePlayerScore(agentId, agentName, currentScore + 1, isSwiftPlayer);
-    }
-  };
+ 
   
   // Function to decrement player score
-  const decrementPlayerScore = async (agentId: string, agentName: string, isSwiftPlayer: boolean = false): Promise<void> => {
-    const player = playerScores.find(p => 
-      (isSwiftPlayer && p.isSwiftPlayer) || p.agentId === agentId
-    );
-    
-    if (player) {
-      const currentScore = player.score || 0;
-      if (currentScore > 0) {
-        await updatePlayerScore(agentId, agentName, currentScore - 1, isSwiftPlayer);
-      }
-    }
-  };
-
-  // Reset all scores
-  const resetAllScores = async (): Promise<void> => {
-    try {
-      // Update all players in our local state
-      const resetScores = playerScores.map(player => ({
-        ...player,
-        score: 0
-      }));
-      
-      setPlayerScores(resetScores);
-      
-      // Get all agents in this room from Firestore
-      const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
-      const agentSnapshots = await getDocs(agentsQuery);
-      
-      // Create a batch to update all at once
-      const batch = writeBatch(db);
-      
-      // Reset score for all agents
-      agentSnapshots.forEach(document => {
-        batch.update(document.ref, { score: 0 });
-      });
-      
-      // Commit the batch
-      await batch.commit();
-    } catch (error) {
-      console.error("Error resetting scores:", error);
-    }
-  };
+ 
 
   useEffect(() => {
     // Load agent name from localStorage
@@ -310,14 +275,18 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     const initializeAgent = async () => {
       const roomValid = await checkRoom();
       if (!roomValid) return;
-
+    
       // First, check if we have agent data in Firestore
       const agentKey = `${roomId}_${agentSlug}`;
       const agentRef = doc(db, "agents", agentKey);
       const agentSnap = await getDoc(agentRef);
       
+      // Track if the agent has been properly initialized
+      let agentInitialized = false;
+      
       // If agent data exists, synchronize the local name with Firestore data
       if (agentSnap.exists()) {
+        agentInitialized = true;
         const data = agentSnap.data();
         setAgentId(data.agentId ?? null);
         setCodeWord(data.codeWord ?? null);
@@ -331,6 +300,26 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
           setIsSpy(Boolean(data.isSpy));
         }
       }
+      
+      // Setup a listener to detect if this agent has been removed
+      // Only consider removal after the agent has been initialized
+      const agentRemovalListener = onSnapshot(
+        doc(db, "agents", agentKey),
+        (docSnapshot) => {
+          // Only detect removal if the agent was previously initialized
+          if (agentInitialized && !docSnapshot.exists()) {
+            // The agent document no longer exists - this agent has been removed
+            console.log("Agent has been removed from the room");
+            setHasBeenRemoved(true);
+          } else if (docSnapshot.exists()) {
+            // Update our initialization flag once document exists
+            agentInitialized = true;
+          }
+        },
+        (error) => {
+          console.error("Error setting up agent removal listener:", error);
+        }
+      );
 
       // Set up settings listener
       const settingsRef = doc(db, "settings", roomId);
@@ -388,6 +377,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
       return () => {
         unsubscribeSettings();
         unsubscribeAgent();
+        agentRemovalListener(); // Cleanup the removal listener
       };
     };
 
@@ -594,6 +584,15 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     }
   };
 
+  // Handle the case where the agent has been removed
+  if (hasBeenRemoved) {
+    return (
+      <RemovedAlert onClose={() => {
+        router.push('/');
+      }} />
+    );
+  }
+
   if (!loading && !error && !gameStarted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -644,6 +643,13 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
 
   return (
     <div className={`min-h-screen ${getBgClasses()} flex items-center justify-center p-6 relative overflow-hidden`}>
+      {/* Show the removed alert if the player has been removed */}
+      {hasBeenRemoved && (
+        <RemovedAlert onClose={() => {
+          router.push('/');
+        }} />
+      )}
+      
       {(isAnySpymaster || isSpy) && (
         <div className="absolute inset-0">
           <div
@@ -872,40 +878,10 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
                   )}
                 </div>
                 
-                <div className="flex items-center space-x-3">
-                  <button 
-                    onClick={() => decrementPlayerScore(player.agentId, player.agentName, player.isSwiftPlayer)}
-                    className={`p-1 rounded-full ${
-                      player.score <= 0 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                    }`}
-                    disabled={player.score <= 0}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" 
-                         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="8" y1="12" x2="16" y2="12"></line>
-                    </svg>
-                  </button>
-                  
-                  <div className={`px-3 py-1 rounded-full font-mono w-12 text-center ${
-                    player.isSwiftPlayer ? 'bg-blue-100' : 'bg-gray-200'
-                  }`}>
-                    {player.score}
-                  </div>
-                  
-                  <button 
-                    onClick={() => incrementPlayerScore(player.agentId, player.agentName, player.isSwiftPlayer)}
-                    className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" 
-                         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="8" x2="12" y2="16"></line>
-                      <line x1="8" y1="12" x2="16" y2="12"></line>
-                    </svg>
-                  </button>
+                <div className={`px-3 py-1 rounded-full font-mono text-center ${
+                  player.isSwiftPlayer ? 'bg-blue-100' : 'bg-gray-200'
+                }`}>
+                  {player.score}
                 </div>
               </div>
             ))}
@@ -913,16 +889,10 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex space-x-3">
-        <button
-          onClick={resetAllScores}
-          className="w-1/2 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors font-medium"
-        >
-          Reset All Scores
-        </button>
+      <div className="p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end">
         <button
           onClick={() => setShowScores(false)}
-          className="w-1/2 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          className="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
         >
           Close
         </button>
