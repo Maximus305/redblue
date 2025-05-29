@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
 
 export default function PartykiteLanding() {
-  const [expandedGame, setExpandedGame] = useState(null);
-  const [showEmailSignup, setShowEmailSignup] = useState(false);
-  const [email, setEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null); // 'success' or 'error'
+  const [expandedGame, setExpandedGame] = useState<number | null>(null);
+  const [showEmailSignup, setShowEmailSignup] = useState<boolean>(false);
+  const [email, setEmail] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
 
   const games = [
     {
@@ -47,7 +47,7 @@ export default function PartykiteLanding() {
     }
   ];
 
-  const handleEmailSubmit = async (e) => {
+  const handleEmailSubmit = async (e: React.MouseEvent<HTMLButtonElement> | React.FormEvent) => {
     e.preventDefault();
     
     // Basic email validation
@@ -86,7 +86,7 @@ export default function PartykiteLanding() {
     }
   };
 
-  const handleEmailChange = (e) => {
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
     if (submitStatus === 'error') {
       setSubmitStatus(null);
@@ -99,7 +99,7 @@ export default function PartykiteLanding() {
     setEmail('');
   };
 
-  const toggleGameRules = (gameId) => {
+  const toggleGameRules = (gameId: number) => {
     setExpandedGame(expandedGame === gameId ? null : gameId);
   };
 
@@ -363,7 +363,7 @@ export default function PartykiteLanding() {
                     type="email"
                     value={email}
                     onChange={handleEmailChange}
-                    onKeyPress={(e) => e.key === 'Enter' && handleEmailSubmit(e)}
+                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleEmailSubmit(e)}
                     placeholder="Enter your email address"
                     className="w-full px-6 py-4 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:border-gray-900 transition-colors text-lg mb-6"
                   />
