@@ -275,7 +275,7 @@ export default function PartykiteLanding() {
                 👥
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-4">Perfect for Groups</h3>
-              <p className="text-gray-600 leading-relaxed">Whether it's 4 friends or 20 party-goers, our games scale perfectly for any group size.</p>
+              <p className="text-gray-600 leading-relaxed">Whether it&apos;s 4 friends or 20 party-goers, our games scale perfectly for any group size.</p>
             </div>
             
             <div className="text-center p-8 rounded-2xl bg-white border border-gray-200 hover:shadow-lg transition-shadow">
@@ -347,7 +347,7 @@ export default function PartykiteLanding() {
                   onClick={handleModalClose}
                   className="bg-gray-900 text-white px-8 py-4 rounded-lg font-bold hover:bg-gray-800 transition-colors"
                 >
-                  Let's Go! 🚀
+                  Let&apos;s Go! 🚀
                 </button>
               </div>
             ) : (
