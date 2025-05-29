@@ -1,0 +1,200 @@
+"use client"
+import React from 'react';
+import { ArrowLeft } from 'lucide-react';
+
+export default function PrivacyPolicy() {
+  const handleBack = () => {
+    if (typeof window !== 'undefined') {
+      window.history.back();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      {/* Header */}
+      <nav className="bg-white shadow-sm border-b">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleBack}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center">
+                <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5">
+                  <path d="M12 2l2.09 6.26L20 12l-5.91 3.74L12 22l-2.09-6.26L4 12l5.91-3.74L12 2z"/>
+                </svg>
+              </div>
+              <span className="text-xl font-bold text-gray-900">Partykite</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Header Bar */}
+      <div className="bg-gray-100 border-b border-gray-200">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <h1 className="text-lg font-medium tracking-wide text-gray-900 font-mono">
+            PRIVACY POLICY
+          </h1>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
+          <div className="space-y-8">
+            {/* Title Section */}
+            <div className="space-y-4">
+              <h2 className="text-3xl font-bold text-gray-900">Privacy Policy</h2>
+              <p className="text-sm text-gray-500">Last Updated: March 18, 2025</p>
+              
+              <p className="text-gray-700 leading-relaxed">
+                {`Party Kite Inc ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how your personal information is collected, used, and disclosed by Party Kite.`}
+              </p>
+              
+              <p className="text-gray-700 leading-relaxed">
+                This Privacy Policy applies to our app, Party Kite, and its associated services. By accessing or using our Service, you signify that you have read, understood, and agree to our collection, storage, use, and disclosure of your personal information as described in this Privacy Policy.
+              </p>
+            </div>
+
+            {/* Section 1 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">1. Information We Collect</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                We collect several different types of information for various purposes to provide and improve our Service to you:
+              </p>
+              
+              <div className="space-y-3">
+                <p className="text-gray-700 leading-relaxed">
+                  <strong>• Personal Data:</strong> While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you. This may include, but is not limited to:
+                </p>
+                <div className="pl-6 space-y-1">
+                  <p className="text-gray-700">- Email address</p>
+                  <p className="text-gray-700">- First name and last name</p>
+                  <p className="text-gray-700">- Usage data</p>
+                </div>
+                
+                <p className="text-gray-700 leading-relaxed">
+                  <strong>• Usage Data:</strong> We may also collect information that your device sends whenever you visit our Service or when you access the Service by or through a mobile device.
+                </p>
+              </div>
+            </div>
+
+            {/* Section 2 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">2. Use of Data</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                Party Kite uses the collected data for various purposes:
+              </p>
+              
+              <div className="space-y-2">
+                <p className="text-gray-700">• To provide and maintain our Service</p>
+                <p className="text-gray-700">• To notify you about changes to our Service</p>
+                <p className="text-gray-700">• To allow you to participate in interactive features of our Service when you choose to do so</p>
+                <p className="text-gray-700">• To provide customer support</p>
+                <p className="text-gray-700">• To gather analysis or valuable information so that we can improve our Service</p>
+                <p className="text-gray-700">• To monitor the usage of our Service</p>
+                <p className="text-gray-700">• To detect, prevent and address technical issues</p>
+              </div>
+            </div>
+
+            {/* Section 3 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">3. Transfer of Data</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                Your information, including Personal Data, may be transferred to — and maintained on — computers located outside of your state, province, country or other governmental jurisdiction where the data protection laws may differ from those of your jurisdiction.
+              </p>
+              
+              <p className="text-gray-700 leading-relaxed">
+                Your consent to this Privacy Policy followed by your submission of such information represents your agreement to that transfer.
+              </p>
+            </div>
+
+            {/* Section 4 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">4. Disclosure of Data</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                We may disclose your Personal Data in the following situations:
+              </p>
+              
+              <div className="space-y-3">
+                <p className="text-gray-700 leading-relaxed">
+                  <strong>• To Service Providers:</strong> We may share your personal information with third-party service providers to perform tasks on our behalf and to assist us in providing the Service.
+                </p>
+                
+                <p className="text-gray-700 leading-relaxed">
+                  <strong>• For Business Transfers:</strong> We may share or transfer your personal information in connection with, or during negotiations of, any merger, sale of company assets, financing, or acquisition of all or a portion of our business to another company.
+                </p>
+                
+                <p className="text-gray-700 leading-relaxed">
+                  <strong>• With Your Consent:</strong> We may disclose your personal information for any other purpose with your consent.
+                </p>
+              </div>
+            </div>
+
+            {/* Section 5 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">5. Security of Data</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                The security of your data is important to us but remember that no method of transmission over the Internet or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.
+              </p>
+            </div>
+
+            {/* Section 6 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">6. Your Data Protection Rights</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                If you are a resident of the European Economic Area (EEA), you have certain data protection rights. Party Kite aims to take reasonable steps to allow you to correct, amend, delete, or limit the use of your Personal Data.
+              </p>
+              
+              <p className="text-gray-700 leading-relaxed">You have the right to:</p>
+              <div className="space-y-2">
+                <p className="text-gray-700">• Access and receive a copy of your personal data</p>
+                <p className="text-gray-700">• Rectify or update your personal data</p>
+                <p className="text-gray-700">• Request deletion of your personal data</p>
+                <p className="text-gray-700">• Request restriction of processing of your personal data</p>
+                <p className="text-gray-700">• Object to processing of your personal data</p>
+                <p className="text-gray-700">• Request transfer of your personal data</p>
+              </div>
+            </div>
+
+            {/* Section 7 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">7. Changes to This Privacy Policy</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the {`"Last Updated"`} date at the top of this Privacy Policy.
+              </p>
+              
+              <p className="text-gray-700 leading-relaxed">
+                You are advised to review this Privacy Policy periodically for any changes. Changes to this Privacy Policy are effective when they are posted on this page.
+              </p>
+            </div>
+
+            {/* Section 8 */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-gray-900">8. Contact Us</h3>
+              
+              <p className="text-gray-700 leading-relaxed">
+                If you have any questions about this Privacy Policy, please contact us here:
+              </p>
+              
+              <p className="text-gray-900 font-medium">
+                team@partykite.com
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
