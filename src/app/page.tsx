@@ -1,4 +1,3 @@
-"use client"
 import React, { useState } from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
 
@@ -12,7 +11,7 @@ export default function PartykiteLanding() {
   const games = [
     {
       id: 1,
-      title: "Who's the Spy",
+      title: "Who&apos;s the Spy",
       description: "The ultimate deception game where one player gets a different word and must blend in while figuring out the real word. Perfect for 4-10 players!",
       players: "4-10 players",
       duration: "10-15 min",
@@ -340,7 +339,7 @@ export default function PartykiteLanding() {
                 </div>
                 <h4 className="text-2xl font-bold text-gray-900 mb-4">Welcome to the Party!</h4>
                 <p className="text-gray-600 mb-8 leading-relaxed">
-                  You're all set! We'll send you exclusive updates and notify you the moment Partykite is ready to rock.
+                  You&apos;re all set! We&apos;ll send you exclusive updates and notify you the moment Partykite is ready to rock.
                 </p>
                 <button 
                   onClick={handleModalClose}
