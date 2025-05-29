@@ -3,6 +3,22 @@
 import React, { useState } from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
 
+// Extend the Window interface to include Firebase
+declare global {
+  interface Window {
+    firebase?: {
+      firestore: () => {
+        collection: (name: string) => {
+          add: (data: any) => Promise<any>;
+        };
+        FieldValue: {
+          serverTimestamp: () => any;
+        };
+      };
+    };
+  }
+}
+
 export default function PartykiteLanding() {
   const [expandedGame, setExpandedGame] = useState<number | null>(null);
   const [showEmailSignup, setShowEmailSignup] = useState<boolean>(false);
