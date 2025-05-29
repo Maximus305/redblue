@@ -1,23 +1,12 @@
 "use client"
-
 import React, { useState } from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
-
-// Extend the Window interface to include Firebase
-declare global {
-  interface Window {
-    firebase?: {
-      firestore: () => {
-        collection: (name: string) => {
-          add: (data: any) => Promise<any>;
-        };
-        FieldValue: {
-          serverTimestamp: () => any;
-        };
-      };
-    };
-  }
-}
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 export default function PartykiteLanding() {
   const [expandedGame, setExpandedGame] = useState<number | null>(null);
@@ -29,7 +18,7 @@ export default function PartykiteLanding() {
   const games = [
     {
       id: 1,
-      title: "Who&apos;s the Spy",
+      title: "Who's the Spy",
       description: "The ultimate deception game where one player gets a different word and must blend in while figuring out the real word. Perfect for 4-10 players!",
       players: "4-10 players",
       duration: "10-15 min",
@@ -74,25 +63,18 @@ export default function PartykiteLanding() {
     setSubmitStatus(null);
 
     try {
-      // Check if Firebase is available
-      if (typeof window !== 'undefined' && window.firebase && window.firebase.firestore) {
-        const db = window.firebase.firestore();
-        
-        // Add email to Firestore
-        await db.collection('email_signups').add({
-          email: email.trim(),
-          timestamp: window.firebase.firestore.FieldValue.serverTimestamp(),
-          source: 'partykite-landing',
-          userAgent: navigator.userAgent,
-          createdAt: new Date().toISOString()
-        });
+      // Add email to Firestore using v9+ modular SDK
+      await addDoc(collection(db, 'email_signups'), {
+        email: email.trim(),
+        timestamp: serverTimestamp(),
+        source: 'partykite-landing',
+        userAgent: navigator.userAgent,
+        createdAt: new Date().toISOString()
+      });
 
-        console.log('Email successfully saved to Firestore:', email.trim());
-        setSubmitStatus('success');
-        setEmail('');
-      } else {
-        throw new Error('Firebase not initialized');
-      }
+      console.log('Email successfully saved to Firestore:', email.trim());
+      setSubmitStatus('success');
+      setEmail('');
       
     } catch (error) {
       console.error('Error saving email to Firestore:', error);
@@ -291,7 +273,7 @@ export default function PartykiteLanding() {
                 👥
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-4">Perfect for Groups</h3>
-              <p className="text-gray-600 leading-relaxed">Whether it&apos;s 4 friends or 20 party-goers, our games scale perfectly for any group size.</p>
+              <p className="text-gray-600 leading-relaxed">{`Whether it's 4 friends or 20 party-goers, our games scale perfectly for any group size.`}</p>
             </div>
             
             <div className="text-center p-8 rounded-2xl bg-white border border-gray-200 hover:shadow-lg transition-shadow">
@@ -357,13 +339,13 @@ export default function PartykiteLanding() {
                 </div>
                 <h4 className="text-2xl font-bold text-gray-900 mb-4">Welcome to the Party!</h4>
                 <p className="text-gray-600 mb-8 leading-relaxed">
-                  You&apos;re all set! We&apos;ll send you exclusive updates and notify you the moment Partykite is ready to rock.
+                  {`You're all set! We'll send you exclusive updates and notify you the moment Partykite is ready to rock.`}
                 </p>
                 <button 
                   onClick={handleModalClose}
                   className="bg-gray-900 text-white px-8 py-4 rounded-lg font-bold hover:bg-gray-800 transition-colors"
                 >
-                  Let&apos;s Go! 🚀
+                  {`Let's Go! 🚀`}
                 </button>
               </div>
             ) : (
