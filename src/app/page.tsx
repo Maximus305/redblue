@@ -115,11 +115,11 @@ export default function PartykiteLanding() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center">
-                <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6">
-                  <path d="M12 2l2.09 6.26L20 12l-5.91 3.74L12 22l-2.09-6.26L4 12l5.91-3.74L12 2z"/>
-                </svg>
-              </div>
+              <img 
+                src="/partykitelogo.png" 
+                alt="Partykite Logo" 
+                className="w-10 h-10"
+              />
               <span className="text-2xl font-bold text-gray-900">Partykite</span>
             </div>
             
