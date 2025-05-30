@@ -112,6 +112,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [loadingScores, setLoadingScores] = useState(false);
   const [hasBeenRemoved, setHasBeenRemoved] = useState(false);
+  const [iconSize, setIconSize] = useState(80);
   
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket',
@@ -121,6 +122,21 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     'Rocket', 'Car', 'Hack', 'Key',
     'Bike', 'Gun', 'Rubiks'
   ];
+
+  // Add this useEffect to handle responsive icon sizing:
+  useEffect(() => {
+    const updateIconSize = () => {
+      const width = window.innerWidth;
+      if (width < 640) setIconSize(36);
+      else if (width < 768) setIconSize(56);
+      else if (width < 1024) setIconSize(72);
+      else setIconSize(80);
+    };
+
+    updateIconSize();
+    window.addEventListener('resize', updateIconSize);
+    return () => window.removeEventListener('resize', updateIconSize);
+  }, []);
   
   // Player score functions
   // Improved fetchPlayerScores function with better iOS player deduplication
@@ -796,22 +812,24 @@ const fetchPlayerScores = async (): Promise<void> => {
             )}
 
             {(isSpy || codeWord === 'spy') && (
-              <div className="mt-12 space-y-4">
-                <div className={`font-mono text-lg ${getTextColorClass()}`}>ALL POSSIBLE CODE SIGNS</div>
-                <div className="grid grid-cols-4 gap-4">
+              <div className="mt-8 sm:mt-12 space-y-4">
+                <div className={`font-mono text-base sm:text-lg ${getTextColorClass()}`}>ALL POSSIBLE CODE SIGNS</div>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3 md:gap-4">
                   {allCodeWords.map((word) => (
                     <div
                       key={word}
-                      className={`${getBgClasses()} border ${getBorderColorClass()} p-4 rounded-lg aspect-square flex items-center justify-center relative group`}
+                      className={`${getBgClasses()} border ${getBorderColorClass()} p-2 sm:p-3 md:p-4 rounded-lg aspect-square flex items-center justify-center relative group min-h-[80px] sm:min-h-[100px] md:min-h-[120px]`}
                     >
                       <div
                         className={`absolute inset-0 bg-red-100 opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
                       />
-                      <IconForWord
-                        word={word}
-                        size={80}
-                        className={getTextColorClass()}
-                      />
+                      <div className="w-full h-full flex items-center justify-center">
+                        <IconForWord
+                          word={word}
+                          size={iconSize}
+                          className={getTextColorClass()}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
