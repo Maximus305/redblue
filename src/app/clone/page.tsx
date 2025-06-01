@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Target, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Shield, Target, Clock, CheckCircle } from 'lucide-react';
 import { 
   collection, 
   doc, 
@@ -92,19 +92,20 @@ const firebaseApi = {
       });
       
       return { success: true, playerId };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error joining room:', error);
       
       // Handle specific Firebase errors
-      if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === 'unavailable' || firebaseError.code === 'deadline-exceeded') {
         throw new Error('Connection timeout. Please check your internet connection and try again.');
-      } else if (error.code === 'permission-denied') {
+      } else if (firebaseError.code === 'permission-denied') {
         throw new Error('Permission denied. Please check if the room exists.');
-      } else if (error.message === 'Room not found') {
+      } else if (firebaseError.message === 'Room not found') {
         throw new Error('Room not found. Please check the room ID.');
       }
       
-      throw new Error(error.message || 'Failed to join room. Please try again.');
+      throw new Error(firebaseError.message || 'Failed to join room. Please try again.');
     }
   },
   
@@ -130,15 +131,16 @@ const firebaseApi = {
       });
       
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating clone profile:', error);
       
       // Handle specific Firebase errors
-      if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
+      const firebaseError = error as { code?: string; message?: string };
+      if (firebaseError.code === 'unavailable' || firebaseError.code === 'deadline-exceeded') {
         throw new Error('Connection timeout. Please try again.');
       }
       
-      throw new Error(error.message || 'Failed to create clone profile. Please try again.');
+      throw new Error(firebaseError.message || 'Failed to create clone profile. Please try again.');
     }
   },
   
@@ -161,7 +163,7 @@ const firebaseApi = {
         },
         (error) => {
           console.error('Room listener error:', error);
-          if (error.code === 'unavailable') {
+          if ((error as { code?: string }).code === 'unavailable') {
             console.log('Firestore temporarily unavailable, will retry...');
           }
         }
@@ -208,7 +210,7 @@ const firebaseApi = {
         },
         (error) => {
           console.error('Players listener error:', error);
-          if (error.code === 'unavailable') {
+          if ((error as { code?: string }).code === 'unavailable') {
             console.log('Firestore temporarily unavailable, will retry...');
           }
         }
@@ -281,8 +283,9 @@ const CloneGamePlayer: React.FC = () => {
         setPlayerId(result.playerId);
         setGameState('creating-clone');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to join room. Please check the room ID and try again.');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Failed to join room. Please check the room ID and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -302,8 +305,9 @@ const CloneGamePlayer: React.FC = () => {
       if (result.success) {
         setGameState('waiting');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create clone profile. Please try again.');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'Failed to create clone profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -426,7 +430,7 @@ const CloneGamePlayer: React.FC = () => {
 
         <div>
           <label htmlFor="backgroundInfo" className="block text-sm font-medium text-gray-700 mb-2">
-            Background & Experiences
+            Background &amp; Experiences
           </label>
           <textarea
             id="backgroundInfo"
@@ -576,7 +580,7 @@ const CloneGamePlayer: React.FC = () => {
             <h4 className="font-semibold text-yellow-900 mb-2">How to Play</h4>
             <ul className="text-sm text-yellow-800 space-y-1">
               <li>• Teams take turns having a member answer questions</li>
-              <li>• You can answer as yourself OR use your AI clone's response</li>
+              <li>• You can answer as yourself OR use your AI clone&apos;s response</li>
               <li>• The other team tries to guess if it was you or your clone</li>
               <li>• Points are awarded for correct identifications</li>
             </ul>
@@ -595,14 +599,14 @@ const CloneGamePlayer: React.FC = () => {
         Game Started!
       </h1>
       <p className="text-gray-600 mb-8">
-        The game has begun. Follow the host's instructions for your turn.
+        The game has begun. Follow the host&apos;s instructions for your turn.
       </p>
       
       <div className="space-y-6">
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
           <h3 className="font-semibold text-orange-900 mb-2">Your Role</h3>
           <p className="text-orange-700">
-            When it's your turn, you'll be asked a question. You can choose to answer 
+            When it&apos;s your turn, you&apos;ll be asked a question. You can choose to answer 
             authentically as yourself, or read the AI-generated response from your clone. 
             The opposing team will try to guess which one you chose!
           </p>
