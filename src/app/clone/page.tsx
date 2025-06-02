@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Target, Clock, CheckCircle } from 'lucide-react';
+import { Users, UserPlus, Shield, Target, Clock, CheckCircle, Crown } from 'lucide-react';
 import { 
   collection, 
   doc, 
@@ -8,7 +8,10 @@ import {
   getDoc, 
   onSnapshot, 
   updateDoc, 
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 // Import your existing Firebase setup
 import { db } from '@/lib/firebase';
@@ -26,6 +29,7 @@ interface Player {
   name: string;
   teamId: 'A' | 'B' | null;
   hasCloneProfile: boolean;
+  isHost?: boolean;
 }
 
 interface RoomData {
@@ -47,13 +51,13 @@ interface CreateCloneResponse {
 
 type GameState = 'joining' | 'waiting' | 'creating-clone' | 'playing';
 
-// Firebase functions using the same patterns as your working agent page
+// Firebase functions compatible with iOS app
 const firebaseApi = {
   joinRoom: async (roomId: string, playerName: string): Promise<JoinRoomResponse> => {
     try {
       console.log(`Joining room ${roomId} as ${playerName}`);
       
-      // Check if room exists (using same pattern as agent page)
+      // Check if room exists
       const roomRef = doc(db, 'rooms', roomId);
       const roomDoc = await getDoc(roomRef);
       
@@ -66,36 +70,36 @@ const firebaseApi = {
         throw new Error('This room is no longer active');
       }
       
-      // Generate a unique player ID (matching agent pattern)
-      const playerId = `clone_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate player ID matching iOS app format
+      const playerId = `${playerName}_${Date.now()}`;
       
-      // Create player document using the pattern from agent page
+      // Create player document in agents collection (matches iOS app expectation)
       const playerKey = `${roomId}_${playerId}`;
-      const playerRef = doc(db, 'agents', playerKey); // Use agents collection like the working code
+      const playerRef = doc(db, 'agents', playerKey);
       await setDoc(playerRef, {
         agentId: playerId,
         agentName: playerName,
+        playerName: playerName, // Add both for compatibility
         roomId: roomId,
-        codeWord: '',
-        isSpy: false,
-        platform: 'web',
-        gameType: 'clone', // Mark as clone game player
-        teamId: null,
+        teamId: null, // Will be auto-assigned by iOS app
         hasCloneProfile: false,
+        platform: 'web',
+        gameType: 'clone',
         joinedAt: serverTimestamp()
       });
       
-      // Update room's last activity (same as agent page)
+      // Update room's last activity (triggers iOS app to sync this player)
       await updateDoc(roomRef, {
         lastActivity: serverTimestamp(),
         lastPlayerJoined: playerName
       });
       
+      console.log(`✅ Player ${playerName} added to agents collection`);
+      
       return { success: true, playerId };
     } catch (error: unknown) {
       console.error('Error joining room:', error);
       
-      // Handle specific Firebase errors
       const firebaseError = error as { code?: string; message?: string };
       if (firebaseError.code === 'unavailable' || firebaseError.code === 'deadline-exceeded') {
         throw new Error('Connection timeout. Please check your internet connection and try again.');
@@ -121,7 +125,7 @@ const firebaseApi = {
         Speech: ${cloneInfo.speechPatterns}
       `.trim();
       
-      // Update player document with clone information (using agents collection)
+      // Update player document with clone information
       const playerKey = `${roomId}_${playerId}`;
       const playerRef = doc(db, 'agents', playerKey);
       await updateDoc(playerRef, {
@@ -130,11 +134,28 @@ const firebaseApi = {
         cloneCreatedAt: serverTimestamp()
       });
       
+      // ALSO update the clonePlayers collection if it exists (for iOS app compatibility)
+      try {
+        const clonePlayerRef = doc(db, 'rooms', roomId, 'clonePlayers', playerId);
+        const clonePlayerDoc = await getDoc(clonePlayerRef);
+        
+        if (clonePlayerDoc.exists()) {
+          await updateDoc(clonePlayerRef, {
+            cloneInfo: combinedCloneInfo,
+            hasCloneProfile: true,
+            cloneCreatedAt: serverTimestamp()
+          });
+          console.log(`✅ Updated clonePlayers collection for ${playerId}`);
+        }
+      } catch (cloneError) {
+        // It's okay if clonePlayers doesn't exist yet
+        console.log('ClonePlayers collection not found, will be synced by iOS app');
+      }
+      
       return { success: true };
     } catch (error: unknown) {
       console.error('Error creating clone profile:', error);
       
-      // Handle specific Firebase errors
       const firebaseError = error as { code?: string; message?: string };
       if (firebaseError.code === 'unavailable' || firebaseError.code === 'deadline-exceeded') {
         throw new Error('Connection timeout. Please try again.');
@@ -149,7 +170,7 @@ const firebaseApi = {
     let isActive = true;
     
     try {
-      // Listen to room document for game state (same as agent page)
+      // Listen to room document for game state
       const roomRef = doc(db, 'rooms', roomId);
       const roomUnsubscribe = onSnapshot(
         roomRef, 
@@ -163,35 +184,35 @@ const firebaseApi = {
         },
         (error) => {
           console.error('Room listener error:', error);
-          if ((error as { code?: string }).code === 'unavailable') {
-            console.log('Firestore temporarily unavailable, will retry...');
-          }
         }
       );
       unsubscribers.push(roomUnsubscribe);
       
-      // Listen to agents collection for clone players (using same collection as working code)
-      const agentsRef = collection(db, 'agents');
-      const agentsUnsubscribe = onSnapshot(
-        agentsRef, 
+      // Listen to clonePlayers collection FIRST (primary source for iOS app)
+      const clonePlayersRef = collection(db, 'rooms', roomId, 'clonePlayers');
+      const clonePlayersUnsubscribe = onSnapshot(
+        clonePlayersRef, 
         async (snapshot) => {
           if (!isActive) return;
           
           try {
-            const players: Player[] = [];
+            const playersFromClone: Player[] = [];
             
             snapshot.forEach((doc) => {
               const data = doc.data();
-              // Only include clone game players from this room
-              if (data.roomId === roomId && data.gameType === 'clone') {
-                players.push({
-                  id: data.agentId || doc.id,
-                  name: data.agentName || data.agentId || doc.id,
-                  teamId: data.teamId || null,
-                  hasCloneProfile: data.hasCloneProfile || false
-                });
-              }
+              const playerId = data.playerId || doc.id;
+              const playerName = data.playerName || data.agentName || playerId;
+              
+              playersFromClone.push({
+                id: playerId,
+                name: playerName,
+                teamId: data.teamId || null,
+                hasCloneProfile: data.hasCloneProfile || false,
+                isHost: data.isHost || false
+              });
             });
+            
+            console.log(`📊 ClonePlayers: Found ${playersFromClone.length} players`);
             
             // Get room data for game state and category
             const roomDoc = await getDoc(roomRef);
@@ -200,19 +221,78 @@ const firebaseApi = {
             callback({
               gameState: roomData?.gameState || 'waiting',
               category: roomData?.category || 'Food',
-              players: players,
+              players: playersFromClone,
               teamAScore: roomData?.teamAScore || 0,
               teamBScore: roomData?.teamBScore || 0
             });
           } catch (error) {
-            console.error('Error processing players update:', error);
+            console.error('Error processing clonePlayers update:', error);
           }
         },
         (error) => {
-          console.error('Players listener error:', error);
-          if ((error as { code?: string }).code === 'unavailable') {
-            console.log('Firestore temporarily unavailable, will retry...');
+          console.error('ClonePlayers listener error:', error);
+        }
+      );
+      unsubscribers.push(clonePlayersUnsubscribe);
+      
+      // FALLBACK: Listen to agents collection if clonePlayers is empty
+      const agentsQuery = query(
+        collection(db, 'agents'),
+        where('roomId', '==', roomId),
+        where('gameType', '==', 'clone')
+      );
+      
+      const agentsUnsubscribe = onSnapshot(
+        agentsQuery, 
+        async (snapshot) => {
+          if (!isActive) return;
+          
+          try {
+            // Only use agents as fallback if clonePlayers is empty
+            const clonePlayersQuery = collection(db, 'rooms', roomId, 'clonePlayers');
+            const clonePlayersSnapshot = await getDocs(clonePlayersQuery);
+            
+            if (!clonePlayersSnapshot.empty) {
+              console.log('📊 ClonePlayers exists, ignoring agents fallback');
+              return; // Don't use agents if clonePlayers has data
+            }
+            
+            const playersFromAgents: Player[] = [];
+            
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              if (data.roomId === roomId && data.gameType === 'clone') {
+                playersFromAgents.push({
+                  id: data.agentId || doc.id,
+                  name: data.agentName || data.playerName || data.agentId || doc.id,
+                  teamId: data.teamId || null,
+                  hasCloneProfile: data.hasCloneProfile || false,
+                  isHost: false
+                });
+              }
+            });
+            
+            console.log(`📊 Agents fallback: Found ${playersFromAgents.length} players`);
+            
+            // Only use this if we actually have players and no clonePlayers
+            if (playersFromAgents.length > 0) {
+              const roomDoc = await getDoc(roomRef);
+              const roomData = roomDoc.data();
+              
+              callback({
+                gameState: roomData?.gameState || 'waiting',
+                category: roomData?.category || 'Food',
+                players: playersFromAgents,
+                teamAScore: roomData?.teamAScore || 0,
+                teamBScore: roomData?.teamBScore || 0
+              });
+            }
+          } catch (error) {
+            console.error('Error processing agents update:', error);
           }
+        },
+        (error) => {
+          console.error('Agents listener error:', error);
         }
       );
       unsubscribers.push(agentsUnsubscribe);
@@ -256,6 +336,7 @@ const CloneGamePlayer: React.FC = () => {
   useEffect(() => {
     if (gameState === 'waiting' && roomId && playerId) {
       const unsubscribe = firebaseApi.listenToRoom(roomId, (data: RoomData) => {
+        console.log('📊 Room data updated:', data);
         setRoomData(data);
         
         // Check if game has started
@@ -487,6 +568,11 @@ const CloneGamePlayer: React.FC = () => {
         <p className="text-gray-600">
           Room ID: <span className="font-mono font-semibold">{roomId}</span>
         </p>
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 inline-block">
+          <p className="text-sm text-blue-800">
+            ✨ Teams are assigned automatically • No manual setup required
+          </p>
+        </div>
       </div>
 
       {roomData && (
@@ -501,14 +587,17 @@ const CloneGamePlayer: React.FC = () => {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h3 className="font-semibold text-red-900 mb-3 flex items-center">
                 <Shield className="w-4 h-4 mr-2" />
-                Team A
+                Team A ({roomData.players.filter(player => player.teamId === 'A').length})
               </h3>
               <div className="space-y-2">
                 {roomData.players
                   .filter(player => player.teamId === 'A')
                   .map(player => (
                     <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <span className="text-sm font-medium">{player.name}</span>
+                      <div className="flex items-center gap-2">
+                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
+                        <span className="text-sm font-medium">{player.name}</span>
+                      </div>
                       {player.hasCloneProfile && (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       )}
@@ -524,14 +613,17 @@ const CloneGamePlayer: React.FC = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
                 <Shield className="w-4 h-4 mr-2" />
-                Team B
+                Team B ({roomData.players.filter(player => player.teamId === 'B').length})
               </h3>
               <div className="space-y-2">
                 {roomData.players
                   .filter(player => player.teamId === 'B')
                   .map(player => (
                     <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <span className="text-sm font-medium">{player.name}</span>
+                      <div className="flex items-center gap-2">
+                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
+                        <span className="text-sm font-medium">{player.name}</span>
+                      </div>
                       {player.hasCloneProfile && (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       )}
@@ -544,17 +636,20 @@ const CloneGamePlayer: React.FC = () => {
             </div>
 
             {/* Unassigned */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <h3 className="font-semibold text-orange-900 mb-3 flex items-center">
                 <Users className="w-4 h-4 mr-2" />
-                Unassigned
+                Joining... ({roomData.players.filter(player => !player.teamId).length})
               </h3>
               <div className="space-y-2">
                 {roomData.players
                   .filter(player => !player.teamId)
                   .map(player => (
                     <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <span className="text-sm font-medium">{player.name}</span>
+                      <div className="flex items-center gap-2">
+                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
+                        <span className="text-sm font-medium">{player.name}</span>
+                      </div>
                       {player.hasCloneProfile && (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       )}
@@ -564,6 +659,11 @@ const CloneGamePlayer: React.FC = () => {
                   <div className="text-sm text-gray-500 italic">All players assigned</div>
                 )}
               </div>
+              {roomData.players.filter(player => !player.teamId).length > 0 && (
+                <p className="text-xs text-orange-700 mt-2">
+                  Will be assigned automatically
+                </p>
+              )}
             </div>
           </div>
 
