@@ -147,7 +147,7 @@ const firebaseApi = {
           });
           console.log(`✅ Updated clonePlayers collection for ${playerId}`);
         }
-      } catch (cloneError) {
+      } catch {
         // It's okay if clonePlayers doesn't exist yet
         console.log('ClonePlayers collection not found, will be synced by iOS app');
       }
