@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Target, Clock, CheckCircle, Crown } from 'lucide-react';
+import { UserPlus, Shield, Target } from 'lucide-react';
 import { 
   collection, 
   doc, 
@@ -403,20 +403,20 @@ const CloneGamePlayer: React.FC = () => {
   const renderJoinScreen = (): React.ReactElement => (
     <div className="max-w-md mx-auto">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <UserPlus className="w-8 h-8 text-blue-600" />
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: 'rgba(0, 69, 255, 0.1)'}}>
+          <UserPlus className="w-8 h-8" style={{color: '#0045FF'}} />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-bold mb-2" style={{color: 'black'}}>
           Join Clone Game
         </h1>
-        <p className="text-gray-600">
+        <p style={{color: 'black'}}>
           Enter the room ID to join the identity challenge
         </p>
       </div>
 
       <div className="space-y-6">
         <div>
-          <label htmlFor="roomId" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="roomId" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             Room ID
           </label>
           <input
@@ -426,13 +426,18 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setRoomId(e.target.value)}
             onKeyPress={(e) => handleKeyPress(e, handleJoinRoom)}
             placeholder="Enter room ID..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              color: 'black',
+              focusRingColor: '#0045FF'
+            }}
             disabled={isLoading}
           />
         </div>
 
         <div>
-          <label htmlFor="playerName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="playerName" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             Your Name
           </label>
           <input
@@ -442,7 +447,12 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setPlayerName(e.target.value)}
             onKeyPress={(e) => handleKeyPress(e, handleJoinRoom)}
             placeholder="Enter your name..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              color: 'black',
+              focusRingColor: '#0045FF'
+            }}
             disabled={isLoading}
           />
         </div>
@@ -456,7 +466,20 @@ const CloneGamePlayer: React.FC = () => {
         <button
           onClick={handleJoinRoom}
           disabled={isLoading || !roomId.trim() || !playerName.trim()}
-          className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full text-white py-3 px-4 rounded-lg font-medium focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          style={{
+            backgroundColor: isLoading || !roomId.trim() || !playerName.trim() ? 'rgba(0, 69, 255, 0.5)' : '#0045FF'
+          }}
+          onMouseEnter={(e) => {
+            if (!isLoading && roomId.trim() && playerName.trim()) {
+              e.currentTarget.style.backgroundColor = '#0038CC';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isLoading && roomId.trim() && playerName.trim()) {
+              e.currentTarget.style.backgroundColor = '#0045FF';
+            }
+          }}
         >
           {isLoading ? 'Joining...' : 'Join Game'}
         </button>
@@ -467,20 +490,20 @@ const CloneGamePlayer: React.FC = () => {
   const renderCloneCreation = (): React.ReactElement => (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Shield className="w-8 h-8 text-purple-600" />
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{backgroundColor: 'rgba(0, 69, 255, 0.1)'}}>
+          <Shield className="w-8 h-8" style={{color: '#0045FF'}} />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-bold mb-2" style={{color: 'black'}}>
           Create Your Clone
         </h1>
-        <p className="text-gray-600">
+        <p style={{color: 'black'}}>
           Provide information that will help AI create your digital twin
         </p>
       </div>
 
       <div className="space-y-6">
         <div>
-          <label htmlFor="personalityTraits" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="personalityTraits" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             Personality Traits
           </label>
           <textarea
@@ -489,13 +512,14 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setCloneInfo(prev => ({...prev, personalityTraits: e.target.value}))}
             placeholder="Describe your personality (e.g., outgoing, thoughtful, sarcastic, optimistic...)"
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 resize-none disabled:opacity-50"
+            style={{backgroundColor: 'rgba(255, 255, 255, 0.9)', color: 'black'}}
             disabled={isLoading}
           />
         </div>
 
         <div>
-          <label htmlFor="favoriteThings" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="favoriteThings" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             Favorite Things
           </label>
           <textarea
@@ -504,13 +528,14 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setCloneInfo(prev => ({...prev, favoriteThings: e.target.value}))}
             placeholder="Your favorite foods, movies, hobbies, places, etc."
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 resize-none disabled:opacity-50"
+            style={{backgroundColor: 'rgba(255, 255, 255, 0.9)', color: 'black'}}
             disabled={isLoading}
           />
         </div>
 
         <div>
-          <label htmlFor="backgroundInfo" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="backgroundInfo" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             Background &amp; Experiences
           </label>
           <textarea
@@ -519,13 +544,14 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setCloneInfo(prev => ({...prev, backgroundInfo: e.target.value}))}
             placeholder="Your background, memorable experiences, places you've lived, etc."
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 resize-none disabled:opacity-50"
+            style={{backgroundColor: 'rgba(255, 255, 255, 0.9)', color: 'black'}}
             disabled={isLoading}
           />
         </div>
 
         <div>
-          <label htmlFor="speechPatterns" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="speechPatterns" className="block text-sm font-medium mb-2" style={{color: 'black'}}>
             How You Speak
           </label>
           <textarea
@@ -534,7 +560,8 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setCloneInfo(prev => ({...prev, speechPatterns: e.target.value}))}
             placeholder="Common phrases you use, how you express yourself, your speaking style..."
             rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 resize-none disabled:opacity-50"
+            style={{backgroundColor: 'rgba(255, 255, 255, 0.9)', color: 'black'}}
             disabled={isLoading}
           />
         </div>
@@ -548,7 +575,18 @@ const CloneGamePlayer: React.FC = () => {
         <button
           onClick={handleCreateClone}
           disabled={isLoading}
-          className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full text-white py-3 px-4 rounded-lg font-medium focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          style={{backgroundColor: isLoading ? 'rgba(0, 69, 255, 0.5)' : '#0045FF'}}
+          onMouseEnter={(e) => {
+            if (!isLoading) {
+              e.currentTarget.style.backgroundColor = '#0038CC';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isLoading) {
+              e.currentTarget.style.backgroundColor = '#0045FF';
+            }
+          }}
         >
           {isLoading ? 'Creating Clone...' : 'Create My Clone'}
         </button>
@@ -556,139 +594,28 @@ const CloneGamePlayer: React.FC = () => {
     </div>
   );
 
-  const renderWaitingRoom = (): React.ReactElement => (
-    <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Clock className="w-8 h-8 text-green-600" />
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Waiting for Game to Start
-        </h1>
-        <p className="text-gray-600">
-          Room ID: <span className="font-mono font-semibold">{roomId}</span>
-        </p>
-        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 inline-block">
-          <p className="text-sm text-blue-800">
-            ✨ Teams are assigned automatically • No manual setup required
+  const renderWaitingRoom = (): React.ReactElement => {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="text-center" style={{ padding: '80px 40px' }}>
+          <div className="flex justify-center mb-12">
+            <div className="animate-spin rounded-full h-28 w-28 border-6" style={{
+              border: '6px solid rgba(255,255,255,0.3)',
+              borderTopColor: 'white'
+            }}></div>
+          </div>
+
+          <p className="font-semibold" style={{
+            fontSize: '32px',
+            color: 'white',
+            lineHeight: '1.4'
+          }}>
+            Waiting for the other players to get it together.
           </p>
         </div>
       </div>
-
-      {roomData && (
-        <div className="space-y-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Game Category</h3>
-            <p className="text-blue-700">{roomData.category}</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Team A */}
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-semibold text-red-900 mb-3 flex items-center">
-                <Shield className="w-4 h-4 mr-2" />
-                Team A ({roomData.players.filter(player => player.teamId === 'A').length})
-              </h3>
-              <div className="space-y-2">
-                {roomData.players
-                  .filter(player => player.teamId === 'A')
-                  .map(player => (
-                    <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <div className="flex items-center gap-2">
-                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
-                        <span className="text-sm font-medium">{player.name}</span>
-                      </div>
-                      {player.hasCloneProfile && (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                  ))}
-                {roomData.players.filter(player => player.teamId === 'A').length === 0 && (
-                  <div className="text-sm text-gray-500 italic">No players assigned</div>
-                )}
-              </div>
-            </div>
-
-            {/* Team B */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
-                <Shield className="w-4 h-4 mr-2" />
-                Team B ({roomData.players.filter(player => player.teamId === 'B').length})
-              </h3>
-              <div className="space-y-2">
-                {roomData.players
-                  .filter(player => player.teamId === 'B')
-                  .map(player => (
-                    <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <div className="flex items-center gap-2">
-                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
-                        <span className="text-sm font-medium">{player.name}</span>
-                      </div>
-                      {player.hasCloneProfile && (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                  ))}
-                {roomData.players.filter(player => player.teamId === 'B').length === 0 && (
-                  <div className="text-sm text-gray-500 italic">No players assigned</div>
-                )}
-              </div>
-            </div>
-
-            {/* Unassigned */}
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h3 className="font-semibold text-orange-900 mb-3 flex items-center">
-                <Users className="w-4 h-4 mr-2" />
-                Joining... ({roomData.players.filter(player => !player.teamId).length})
-              </h3>
-              <div className="space-y-2">
-                {roomData.players
-                  .filter(player => !player.teamId)
-                  .map(player => (
-                    <div key={player.id} className="flex items-center justify-between bg-white rounded p-2">
-                      <div className="flex items-center gap-2">
-                        {player.isHost && <Crown className="w-3 h-3 text-yellow-500" />}
-                        <span className="text-sm font-medium">{player.name}</span>
-                      </div>
-                      {player.hasCloneProfile && (
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      )}
-                    </div>
-                  ))}
-                {roomData.players.filter(player => !player.teamId).length === 0 && (
-                  <div className="text-sm text-gray-500 italic">All players assigned</div>
-                )}
-              </div>
-              {roomData.players.filter(player => !player.teamId).length > 0 && (
-                <p className="text-xs text-orange-700 mt-2">
-                  Will be assigned automatically
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">
-              Waiting for the host to start the game...
-            </p>
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h4 className="font-semibold text-yellow-900 mb-2">How to Play</h4>
-            <ul className="text-sm text-yellow-800 space-y-1">
-              <li>• Teams take turns having a member answer questions</li>
-              <li>• You can answer as yourself OR use your AI clone&apos;s response</li>
-              <li>• The other team tries to guess if it was you or your clone</li>
-              <li>• Points are awarded for correct identifications</li>
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
+  };
 
   const renderGamePlay = (): React.ReactElement => (
     <div className="max-w-2xl mx-auto text-center">
@@ -736,7 +663,7 @@ const CloneGamePlayer: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen py-8 px-4" style={{backgroundColor: '#F5F5F5'}}>
       <div className="container mx-auto">
         {gameState === 'joining' && renderJoinScreen()}
         {gameState === 'creating-clone' && renderCloneCreation()}

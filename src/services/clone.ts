@@ -1,18 +1,14 @@
 import { db } from '@/lib/firebase';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  where,
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
   onSnapshot,
   serverTimestamp,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
-import LobbyService, { Member } from './lobby';
+import LobbyService from './lobby';
 
 // Type definitions
 export interface ClonePlayer {
@@ -21,13 +17,14 @@ export interface ClonePlayer {
   teamId: 'A' | 'B';
   hasCloneProfile: boolean;
   cloneInfo?: string;
+  cloneData?: string;
   isHost: boolean;
-  platform: 'web' | 'ios';
+  platform: 'web' | 'ios' | 'rn';
   joinedAt: Timestamp;
 }
 
 export interface CloneGameState {
-  gamePhase: 'team_assignment' | 'clone_creation' | 'questioning' | 'waiting_for_response' | 'master_review' | 'voting' | 'results';
+  gamePhase: 'team_assignment' | 'clone_creation' | 'questioning' | 'waiting_for_response' | 'master_review' | 'voting' | 'results' | 'game_over';
   topic: string;
   currentPlayer?: string;
   playersAnswered?: string[];     // Track which players have already been questioned
@@ -36,9 +33,10 @@ export interface CloneGameState {
   questionAskedAt?: Timestamp;
   awaitingResponse?: boolean;     // Master waiting for player response
   responseReady?: boolean;        // Player response ready for master
+  speakerReady?: boolean;         // Speaker is ready and others should listen
   playerResponse?: string;        // Player's chosen response
   humanResponse?: string;         // Player's typed response (if chosen)
-  cloneResponse?: string;         // AI generated response  
+  cloneResponse?: string;         // AI generated response
   usedClone?: boolean;           // What player actually chose
   responseSubmittedAt?: Timestamp; // When player responded
   teamAScore: number;
@@ -61,15 +59,20 @@ export interface CloneGameState {
     humanVotes: number;         // Number of human votes
     cloneVotes: number;         // Number of clone votes
   };
+  currentAnswers?: {
+    human?: string;
+    clone?: string;
+  };
   lastUpdated: Timestamp;
 }
 
 // Team color mapping
-export const getTeamColor = (team: 'A' | 'B'): string => team === 'A' ? 'Red' : 'Blue';
-export const getTeamColorCode = (team: 'A' | 'B'): string => team === 'A' ? '#DC2626' : '#2563EB';
-export const getTeamColorClass = (team: 'A' | 'B'): string => team === 'A' ? 'text-red-600' : 'text-blue-600';
-export const getTeamBgClass = (team: 'A' | 'B'): string => team === 'A' ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200';
-export const getTeamEmoji = (team: 'A' | 'B'): string => team === 'A' ? '🔴' : '🔵';
+export const getTeamColor = (team: 'A' | 'B'): string => team === 'A' ? 'Red' : 'Yellow';
+export const getTeamColorCode = (team: 'A' | 'B'): string => team === 'A' ? '#DC2626' : '#EAB308';
+export const getTeamColorClass = (team: 'A' | 'B'): string => team === 'A' ? 'text-red-600' : 'text-yellow-600';
+export const getTeamBgClass = (team: 'A' | 'B'): string => team === 'A' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200';
+export const getTeamEmoji = (team: 'A' | 'B'): string => team === 'A' ? '🔴' : '🟡';
+export const getTeamImage = (team: 'A' | 'B'): string => team === 'A' ? '/teamred.png' : '/teamyellow.png';
 
 export interface JoinRoomResponse {
   success: boolean;
@@ -83,7 +86,13 @@ export interface CreateCloneResponse {
 }
 
 // AI Response Generation using ChatGPT
-export async function generateCloneResponse(cloneData: string, question: string, topic?: string): Promise<string> {
+// Updated to include humanAnswer for clone generation
+export async function generateCloneResponse(
+  cloneData: string,
+  question: string,
+  humanAnswer: string,
+  topic?: string
+): Promise<string> {
   try {
     // Try to use ChatGPT API
     const response = await fetch('/api/generate-clone-response', {
@@ -94,6 +103,7 @@ export async function generateCloneResponse(cloneData: string, question: string,
       body: JSON.stringify({
         cloneData,
         question,
+        humanAnswer,
         topic: topic || 'General'
       })
     });
@@ -105,17 +115,24 @@ export async function generateCloneResponse(cloneData: string, question: string,
 
     // Fallback to simple generator if API fails
     console.warn('API call failed, using fallback generator');
-    return generateFallbackResponse(cloneData, question);
-    
+    return generateFallbackResponse(cloneData, question, humanAnswer);
+
   } catch (error) {
     console.error('Error generating clone response:', error);
-    return generateFallbackResponse(cloneData, question);
+    return generateFallbackResponse(cloneData, question, humanAnswer);
   }
 }
 
 // Fallback response generator
 // Enhanced fallback response generator - matches API version
-function generateFallbackResponse(cloneData: string, question: string): string {
+// Now includes humanAnswer to create believable clone response
+function generateFallbackResponse(cloneData: string, _question: string, humanAnswer: string): string {
+  // Simple transformation of human answer as fallback
+  if (humanAnswer && humanAnswer.trim()) {
+    return `I'd say ${humanAnswer.toLowerCase()}`;
+  }
+
+  // Original fallback if no human answer provided
   const lowerData = cloneData.toLowerCase();
   
   // Base responses by personality type
@@ -438,7 +455,7 @@ export class CloneGameService {
           dataLength: (p.cloneInfo || p.cloneData || '').length
         })));
 
-        const updateData: any = {
+        const updateData: { players: ClonePlayer[]; lastUpdated: ReturnType<typeof serverTimestamp> } = {
           players: updatedPlayers,
           lastUpdated: serverTimestamp()
         };
@@ -537,7 +554,7 @@ export class CloneGameService {
       }
 
       const gameData = gameDoc.data() as CloneGameState;
-      let currentPlayer = gameData.players.find(p => p.id === gameData.currentPlayer);
+      const currentPlayer = gameData.players.find(p => p.id === gameData.currentPlayer);
       
       if (!currentPlayer) {
         throw new Error('Current player not found');
@@ -599,10 +616,12 @@ export class CloneGameService {
           });
 
           // Also fix the lobby member data
-          await LobbyService.updateMember(roomId, gameData.currentPlayer, {
-            hasCloneProfile: false,
-            cloneInfo: undefined
-          });
+          if (gameData.currentPlayer) {
+            await LobbyService.updateMember(roomId, gameData.currentPlayer, {
+              hasCloneProfile: false,
+              cloneInfo: undefined
+            });
+          }
 
           console.log('✅ Fixed inconsistent state and returned to clone creation phase');
 
@@ -653,13 +672,14 @@ export class CloneGameService {
 
       await updateDoc(cloneGameRef, {
         playerResponse,
-        humanResponse: humanAnswer || '',
-        cloneResponse: aiResponse || gameData.cloneResponse || '',
+        humanResponse: choice === 'human' ? (humanAnswer || '') : '',
+        cloneResponse: choice === 'clone' ? (aiResponse || '') : '',
         usedClone: choice === 'clone',
         awaitingResponse: false,        // No longer waiting
-        responseReady: true,            // Master can proceed
+        responseReady: true,            // Response ready for host to proceed
+        speakerReady: false,            // Reset speaker ready state
         responseSubmittedAt: serverTimestamp(),
-        gamePhase: 'master_review',
+        // NOTE: gamePhase is NOT changed here - host manually triggers voting
         lastUpdated: serverTimestamp()
       });
 
@@ -729,9 +749,14 @@ export class CloneGameService {
         throw new Error('Player not found');
       }
 
-      // Only questioning team members can vote
+      // Only questioning team members can vote (not the current player being questioned)
       if (currentPlayer.teamId !== gameData.questioningTeam) {
         throw new Error('Only the questioning team can vote');
+      }
+
+      // Current player being questioned cannot vote
+      if (playerId === gameData.currentPlayer) {
+        throw new Error('The player being questioned cannot vote');
       }
 
       // Record the vote
@@ -747,20 +772,27 @@ export class CloneGameService {
       votes[vote].push(playerId);
       playerVotes[playerId] = vote;
 
-      // Count votes from questioning team
-      const questioningTeamPlayers = gameData.players.filter(p => p.teamId === gameData.questioningTeam);
-      const votesSubmitted = questioningTeamPlayers.filter(p => playerVotes[p.id]).length;
+      // Count votes from questioning team (all members except current player)
+      const questioningTeamPlayers = gameData.players.filter(p =>
+        p.teamId === gameData.questioningTeam &&
+        p.id !== gameData.currentPlayer
+      );
+
+      // All questioning team members can vote (except the one being questioned)
+      const expectedVoters = questioningTeamPlayers;
+
+      const votesSubmitted = expectedVoters.filter(p => playerVotes[p.id]).length;
 
       await updateDoc(cloneGameRef, {
         votes,
         playerVotes,
         votesSubmitted,
-        totalVoters: questioningTeamPlayers.length,
+        totalVoters: expectedVoters.length,
         lastUpdated: serverTimestamp()
       });
 
-      // If all team members have voted, calculate results
-      if (votesSubmitted >= questioningTeamPlayers.length) {
+      // If all expected voters have voted, calculate results
+      if (votesSubmitted >= expectedVoters.length) {
         setTimeout(async () => {
           await this.calculateVotingResults(roomId);
         }, 1000);
@@ -1169,7 +1201,7 @@ export class CloneGameService {
           hasCloneProfile: member.hasCloneProfile || false,
           cloneInfo: member.cloneInfo,
           isHost: member.role === 'host',
-          platform: member.platform === 'ios' ? 'ios' : 'web',
+          platform: member.platform as 'web' | 'ios' | 'rn',
           joinedAt: member.joinedAt || serverTimestamp() as Timestamp
         };
         

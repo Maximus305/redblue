@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { cloneData, question, topic } = await request.json();
+    const { cloneData, question, humanAnswer, topic } = await request.json();
 
-    if (!cloneData || !question) {
+    if (!cloneData || !question || !humanAnswer) {
       return NextResponse.json(
-        { error: 'Missing cloneData or question' },
+        { error: 'Missing cloneData, question, or humanAnswer' },
         { status: 400 }
       );
     }
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       console.error('OpenAI API key not configured');
       // Return a fallback response if API key is not configured
       return NextResponse.json({
-        response: generateFallbackResponse(cloneData, question)
+        response: generateFallbackResponse(humanAnswer)
       });
     }
 
@@ -38,18 +38,18 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `You are playing a party game where you need to impersonate a person based on their personality description. 
-            The topic is: ${topic || 'General'}
-            
-            Personality description: ${cloneData}
-            
-            Answer questions as if you are this person. Keep responses natural, conversational, and 1-2 sentences max. 
-            Don't be too obvious or use exact words from the personality description. 
-            Be subtle and authentic to how a real person would answer.`
+            content: `You are creating a clone response for a party game.
+
+Personality Profile: ${cloneData}
+Topic: ${topic || 'General'}
+Question: ${question}
+Human's Real Answer: ${humanAnswer}
+
+Generate a response that sounds like this person would answer, but is NOT identical to their real answer. Make it believable but subtly different. Keep it natural, conversational, and 1-2 sentences max. The clone should be similar enough to fool people, but with slight variations in wording or phrasing.`
           },
           {
             role: 'user',
-            content: question
+            content: `Based on the human's answer "${humanAnswer}", generate a clone version that sounds like this person.`
           }
         ],
         temperature: 0.8,
@@ -61,12 +61,12 @@ export async function POST(request: NextRequest) {
       const errorBody = await openAIResponse.text();
       console.error('OpenAI API error:', openAIResponse.status, openAIResponse.statusText, errorBody);
       return NextResponse.json({
-        response: generateFallbackResponse(cloneData, question)
+        response: generateFallbackResponse(humanAnswer)
       });
     }
 
     const data = await openAIResponse.json();
-    const aiResponse = data.choices[0]?.message?.content || generateFallbackResponse(cloneData, question);
+    const aiResponse = data.choices[0]?.message?.content || generateFallbackResponse(humanAnswer);
 
     return NextResponse.json({ response: aiResponse });
 
@@ -78,67 +78,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Enhanced fallback response generator
-function generateFallbackResponse(cloneData: string, question: string): string {
-  const lowerData = cloneData.toLowerCase();
-  const lowerQuestion = question.toLowerCase();
-  
-  // Base responses by personality type
-  const responses = {
-    sarcastic: [
-      "Oh, what a totally original question...",
-      "Well, that's definitely something I haven't heard before.",
-      "Let me consult my crystal ball... nope, still unclear.",
-      "Wow, really making me think outside the box here.",
-    ],
-    funny: [
-      "That's like asking me to pick my favorite child!",
-      "Ha! You really want to open that can of worms?",
-      "Oh boy, where do I even start with that one?",
-      "That's a question that could start a whole debate!",
-    ],
-    thoughtful: [
-      "That's a really deep question... I'd need to think about it.",
-      "Hmm, there are so many layers to consider with that.",
-      "You know, that touches on something I've been pondering lately.",
-      "That's the kind of question that keeps me up at night.",
-    ],
-    energetic: [
-      "Oh wow! That's such a great question!",
-      "I LOVE questions like this! So many possibilities!",
-      "Ooh, that's exciting to think about!",
-      "Yes! Finally someone asking the good questions!",
-    ],
-    serious: [
-      "That's a very important question to consider.",
-      "I think that deserves a thoughtful response.",
-      "That's something I take quite seriously.",
-      "That requires careful consideration.",
-    ]
-  };
-  
-  // Default responses
-  const defaultResponses = [
-    "That's an interesting question... I'd say it depends.",
-    "Hmm, I have mixed feelings about that.",
-    "You know, that's actually pretty intriguing.",
-    "I'd probably approach it differently than most people.",
+// Simple fallback - transform the human's answer slightly
+function generateFallbackResponse(humanAnswer: string): string {
+  const variations = [
+    `I'd say ${humanAnswer.toLowerCase()}`,
+    `Probably ${humanAnswer.toLowerCase()}`,
+    `I think ${humanAnswer.toLowerCase()}`,
+    `Definitely ${humanAnswer.toLowerCase()}`,
+    `For sure ${humanAnswer.toLowerCase()}`
   ];
-  
-  // Determine personality type and select appropriate response
-  let selectedResponses = defaultResponses;
-  
-  if (lowerData.includes('sarcastic') || lowerData.includes('sarcasm')) {
-    selectedResponses = responses.sarcastic;
-  } else if (lowerData.includes('funny') || lowerData.includes('humor') || lowerData.includes('comedian')) {
-    selectedResponses = responses.funny;
-  } else if (lowerData.includes('thoughtful') || lowerData.includes('philosophical') || lowerData.includes('deep')) {
-    selectedResponses = responses.thoughtful;
-  } else if (lowerData.includes('energetic') || lowerData.includes('outgoing') || lowerData.includes('enthusiastic')) {
-    selectedResponses = responses.energetic;
-  } else if (lowerData.includes('serious') || lowerData.includes('professional') || lowerData.includes('formal')) {
-    selectedResponses = responses.serious;
-  }
-  
-  return selectedResponses[Math.floor(Math.random() * selectedResponses.length)];
+
+  return variations[Math.floor(Math.random() * variations.length)];
 }

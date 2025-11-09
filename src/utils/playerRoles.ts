@@ -3,7 +3,7 @@
  * Core Principle: Every screen must ALWAYS know WHO you are, WHAT your role is, WHAT you can do
  */
 
-import { CloneGameState, ClonePlayer } from '@/services/clone';
+import { CloneGameState } from '@/services/clone';
 
 // Player role types
 export type PlayerRole = 'QUESTIONER' | 'RESPONDER' | 'VOTER' | 'SPECTATOR';
@@ -17,31 +17,40 @@ export type Platform = 'cloneplay' | 'redblue';
 export function isTeamLeader(gameState: CloneGameState, playerId: string): boolean {
   const player = gameState.players.find(p => p.id === playerId);
   if (!player) return false;
-  
+
   // Get all players in the same team
   const teamPlayers = gameState.players.filter(p => p.teamId === player.teamId);
-  
+
   // If only one player in team, they are the leader
   if (teamPlayers.length === 1) {
     return true;
   }
-  
+
   // Sort by join time to find the first person in each team (team leader)
   const sortedTeamPlayers = [...teamPlayers]
     .filter(p => p.joinedAt) // Only players with join time
-    .sort((a, b) => new Date(a.joinedAt!).getTime() - new Date(b.joinedAt!).getTime());
-  
+    .sort((a, b) => {
+      // Handle Firebase Timestamp objects
+      const aTime = a.joinedAt && typeof a.joinedAt === 'object' && 'toMillis' in a.joinedAt
+        ? a.joinedAt.toMillis()
+        : new Date(a.joinedAt!).getTime();
+      const bTime = b.joinedAt && typeof b.joinedAt === 'object' && 'toMillis' in b.joinedAt
+        ? b.joinedAt.toMillis()
+        : new Date(b.joinedAt!).getTime();
+      return aTime - bTime;
+    });
+
   // First person to join the team is the leader
   if (sortedTeamPlayers.length > 0 && sortedTeamPlayers[0].id === playerId) {
     return true;
   }
-  
+
   // Fallback: If no join times, consider first player alphabetically as leader
   if (sortedTeamPlayers.length === 0) {
     const alphabeticalTeamPlayers = [...teamPlayers].sort((a, b) => a.id.localeCompare(b.id));
     return alphabeticalTeamPlayers[0].id === playerId;
   }
-  
+
   return false;
 }
 
@@ -87,15 +96,9 @@ export function determinePlayerRole(gameState: CloneGameState, myPlayerId: strin
       }
       
     case 'voting':
-      if (isMyTeamQuestioning) {
-        // Team leadership logic for voting
-        if (totalPlayers === 2) {
-          return 'VOTER';             // 2 players: both can vote
-        } else if (amITeamLeader) {
-          return 'VOTER';             // Team leader votes for team
-        } else {
-          return 'SPECTATOR';         // Non-leaders watch voting
-        }
+      if (isMyTeamQuestioning && !isCurrentPlayer) {
+        // All questioning team members can vote (except current player)
+        return 'VOTER';
       } else {
         return 'SPECTATOR';           // Watching voting
       }
@@ -111,7 +114,7 @@ export function determinePlayerRole(gameState: CloneGameState, myPlayerId: strin
 /**
  * Get spectator message based on current game state
  */
-export function getSpectatorMessage(gameState: CloneGameState, myPlayer: ClonePlayer): string {
+export function getSpectatorMessage(gameState: CloneGameState): string {
   const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayer);
   const questioningTeamName = gameState.questioningTeam === 'A' ? 'Team A' : 'Team B';
   const respondingTeamName = currentPlayer?.teamId === 'A' ? 'Team A' : 'Team B';
