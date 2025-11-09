@@ -426,11 +426,10 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setRoomId(e.target.value)}
             onKeyPress={(e) => handleKeyPress(e, handleJoinRoom)}
             placeholder="Enter room ID..."
-            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              color: 'black',
-              focusRingColor: '#0045FF'
+              color: 'black'
             }}
             disabled={isLoading}
           />
@@ -447,11 +446,10 @@ const CloneGamePlayer: React.FC = () => {
             onChange={(e) => setPlayerName(e.target.value)}
             onKeyPress={(e) => handleKeyPress(e, handleJoinRoom)}
             placeholder="Enter your name..."
-            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
+            className="w-full px-4 py-3 border-0 rounded-lg focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:opacity-50"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              color: 'black',
-              focusRingColor: '#0045FF'
+              color: 'black'
             }}
             disabled={isLoading}
           />

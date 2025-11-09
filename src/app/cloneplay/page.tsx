@@ -1,7 +1,6 @@
 "use client"
 import React, { useState, useEffect, useRef } from 'react';
 import CloneGameService, { CloneGameState, ClonePlayer, getTeamColor, getTeamImage } from '@/services/clone';
-import LobbyService from '@/services/lobby';
 import {
   determinePlayerRole,
   validateGameState,
@@ -32,7 +31,6 @@ const CloneGamePlay: React.FC = () => {
 
   const [gameState, setGameState] = useState<GameState>('waiting');
   const [roomId, setRoomId] = useState<string>('');
-  const [playerName, setPlayerName] = useState<string>('');
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [cloneGameData, setCloneGameData] = useState<CloneGameState | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -170,12 +168,11 @@ const CloneGamePlay: React.FC = () => {
       setRoomId(urlRoomId);
       setPlayerId(urlPlayerId);
       
-      // Get player name from localStorage
-      const storedPlayerName = localStorage.getItem(`playerName_${urlRoomId}`) || 
-                               localStorage.getItem('agentName') || 
+      // Get player name from localStorage for logging
+      const storedPlayerName = localStorage.getItem(`playerName_${urlRoomId}`) ||
+                               localStorage.getItem('agentName') ||
                                'Anonymous';
-      setPlayerName(storedPlayerName);
-      
+
       console.log(`🎮 Clone game loaded: Room ${urlRoomId}, Player ${storedPlayerName} (${urlPlayerId})`);
     } else {
       // Fallback to joining flow if no URL params
@@ -330,14 +327,8 @@ const CloneGamePlay: React.FC = () => {
         }
       });
 
-      // Also listen to lobby state for member updates
-      const unsubscribeLobby = LobbyService.listenToRoom(roomId, (state: LobbyState) => {
-        setLobbyState(state);
-      });
-
       return () => {
         unsubscribeGame();
-        unsubscribeLobby();
       };
     }
   }, [roomId, playerId]);
@@ -1492,7 +1483,7 @@ const CloneGamePlay: React.FC = () => {
                     </>,
                     {
                       text: 'Done Speaking - Next',
-                      onClick: () => handleSubmitResponse('human', false),
+                      onClick: () => handleSubmitResponse('human'),
                       disabled: isLoading,
                       loading: isLoading
                     }
@@ -1722,7 +1713,7 @@ const CloneGamePlay: React.FC = () => {
                     </>,
                     {
                       text: 'Done Reading - Next',
-                      onClick: () => handleSubmitResponse('clone', true),
+                      onClick: () => handleSubmitResponse('clone'),
                       disabled: isLoading,
                       loading: isLoading
                     }

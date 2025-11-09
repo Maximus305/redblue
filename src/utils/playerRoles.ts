@@ -265,10 +265,10 @@ export function canPlayerAct(gameState: CloneGameState, myPlayerId: string, acti
       return role === 'QUESTIONER' && !gameState.currentQuestion;
       
     case 'respond':
-      return role === 'RESPONDER' && gameState.currentQuestion && !gameState.playerResponse;
-      
+      return role === 'RESPONDER' && !!gameState.currentQuestion && !gameState.playerResponse;
+
     case 'vote':
-      return role === 'VOTER' && gameState.playerResponse && !gameState.playerVotes?.[myPlayerId];
+      return role === 'VOTER' && !!gameState.playerResponse && !gameState.playerVotes?.[myPlayerId];
       
     default:
       return false;
