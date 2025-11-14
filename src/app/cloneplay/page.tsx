@@ -8,6 +8,8 @@ import {
   isTeamLeader,
   PlayerRole
 } from '@/utils/playerRoles';
+import ScreenWrapper from '@/components/clone/ScreenWrapper';
+import LoadingScreen from '@/components/clone/LoadingScreen';
 
 // Type definitions
 type GameState = 'joining' | 'waiting' | 'creating-clone' | 'playing' | 'results' | 'game_over';
@@ -98,65 +100,15 @@ const CloneGamePlay: React.FC = () => {
     content: React.ReactNode,
     bottomButton?: { text: string; onClick: () => void; disabled?: boolean; loading?: boolean }
   ) => (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#F5F5F5',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px'
-    }}>
-      <div style={{ width: '100%', maxWidth: '500px' }}>
-        {/* Header with title only */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingBottom: '30px'
-        }}>
-          <h1 style={{
-            fontSize: '32px',
-            fontWeight: 'bold',
-            color: 'black',
-            textAlign: 'center',
-            margin: 0,
-            letterSpacing: '1px'
-          }}>{title}</h1>
-        </div>
-
-        {/* Content area - no background */}
-        <div style={{
-          padding: '20px 0',
-          marginBottom: '30px'
-        }}>
-          {content}
-        </div>
-
-        {/* Bottom button if provided */}
-        {bottomButton && (
-          <button
-            onClick={bottomButton.onClick}
-            disabled={bottomButton.disabled || bottomButton.loading}
-            style={{
-              width: '100%',
-              backgroundColor: bottomButton.disabled || bottomButton.loading ? 'rgba(0, 69, 255, 0.5)' : '#0045FF',
-              color: 'white',
-              padding: '20px',
-              borderRadius: '50px',
-              border: 'none',
-              cursor: bottomButton.disabled || bottomButton.loading ? 'not-allowed' : 'pointer',
-              fontSize: '20px',
-              fontWeight: 'bold',
-              transition: 'all 0.2s',
-              opacity: bottomButton.disabled || bottomButton.loading ? 0.6 : 1
-            }}
-          >
-            {bottomButton.loading ? 'Loading...' : bottomButton.text}
-          </button>
-        )}
-      </div>
-    </div>
+    <ScreenWrapper title={title} bottomButton={bottomButton}>
+      {content}
+    </ScreenWrapper>
   );
+
+  // Get current player helper
+  const getCurrentPlayer = (): ClonePlayer | undefined => {
+    return cloneGameData?.players.find(p => p.id === playerId);
+  };
 
   // Get params from URL
   useEffect(() => {
@@ -482,10 +434,6 @@ const CloneGamePlay: React.FC = () => {
     }
   };
 
-  const getCurrentPlayer = (): ClonePlayer | undefined => {
-    return cloneGameData?.players.find(p => p.id === playerId);
-  };
-
   // This screen should never show now since we get roomId from URL
   const renderJoinScreen = (): React.ReactElement => (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -583,144 +531,88 @@ const CloneGamePlay: React.FC = () => {
     </div>
   );
 
-  const renderCloneCreation = (): React.ReactElement => {
-    const content = (
-      <>
-        {/* Topic Display */}
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{
-            fontSize: '28px',
-            fontWeight: 'bold',
-            color: 'black',
-            margin: '0 0 15px 0'
-          }}>
-            Topic: {cloneGameData?.topic || 'General'}
-          </h2>
-          <p style={{
-            fontSize: '20px',
-            color: 'black',
-            margin: 0,
-            lineHeight: '1.5'
-          }}>
-            Describe yourself based on the topic. The AI will use this to mimic you!
-          </p>
-        </div>
-
-        {/* Textarea */}
-        <textarea
-          value={cloneInfo}
-          onChange={(e) => setCloneInfo(e.target.value)}
-          placeholder={`Example: I love trying new restaurants, my favorite cuisine is Thai...`}
-          maxLength={500}
-          className="clone-textarea"
-          style={{
-            width: '100%',
-            minHeight: '180px',
-            padding: '15px',
-            backgroundColor: 'white',
-            border: 'none',
-            borderRadius: '12px',
-            outline: 'none',
-            fontSize: '20px',
-            color: 'black',
-            resize: 'none',
-            boxSizing: 'border-box',
-            fontFamily: 'inherit'
-          }}
-          disabled={isLoading}
-        />
-        <div style={{
-          textAlign: 'right',
-          fontSize: '14px',
-          color: 'rgba(0,0,0,0.7)',
-          marginTop: '10px'
-        }}>
-          {cloneInfo.length}/500
-        </div>
-
-        {error && (
-          <div style={{
-            marginTop: '20px',
-            padding: '15px',
-            backgroundColor: 'rgba(239, 68, 68, 0.3)',
-            borderRadius: '12px'
-          }}>
-            <p style={{ fontSize: '14px', color: 'white', textAlign: 'center', margin: 0 }}>{error}</p>
-          </div>
-        )}
-      </>
-    );
-
-    return renderConsistentScreen(
-      'CREATE YOUR CLONE',
-      content,
-      {
+  const renderCloneCreation = (): React.ReactElement => (
+    <ScreenWrapper
+      title="CREATE YOUR CLONE"
+      bottomButton={{
         text: 'Create Clone',
         onClick: handleCreateClone,
         disabled: !cloneInfo.trim(),
         loading: isLoading
-      }
-    );
-  };
+      }}
+    >
+      {/* Topic Display */}
+      <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+        <h2 style={{
+          fontSize: '28px',
+          fontWeight: 'bold',
+          color: 'black',
+          margin: '0 0 15px 0'
+        }}>
+          Topic: {cloneGameData?.topic || 'General'}
+        </h2>
+        <p style={{
+          fontSize: '20px',
+          color: 'black',
+          margin: 0,
+          lineHeight: '1.5'
+        }}>
+          Describe yourself based on the topic. The AI will use this to mimic you!
+        </p>
+      </div>
+
+      {/* Textarea */}
+      <textarea
+        value={cloneInfo}
+        onChange={(e) => setCloneInfo(e.target.value)}
+        placeholder={`Example: I love trying new restaurants, my favorite cuisine is Thai...`}
+        maxLength={500}
+        className="clone-textarea"
+        style={{
+          width: '100%',
+          minHeight: '180px',
+          padding: '15px',
+          backgroundColor: 'white',
+          border: 'none',
+          borderRadius: '12px',
+          outline: 'none',
+          fontSize: '20px',
+          color: 'black',
+          resize: 'none',
+          boxSizing: 'border-box',
+          fontFamily: 'inherit'
+        }}
+        disabled={isLoading}
+      />
+      <div style={{
+        textAlign: 'right',
+        fontSize: '14px',
+        color: 'rgba(0,0,0,0.7)',
+        marginTop: '10px'
+      }}>
+        {cloneInfo.length}/500
+      </div>
+
+      {error && (
+        <div style={{
+          marginTop: '20px',
+          padding: '15px',
+          backgroundColor: 'rgba(239, 68, 68, 0.3)',
+          borderRadius: '12px'
+        }}>
+          <p style={{ fontSize: '14px', color: 'white', textAlign: 'center', margin: 0 }}>{error}</p>
+        </div>
+      )}
+    </ScreenWrapper>
+  );
 
   const renderWaitingRoom = (): React.ReactElement => {
     const currentPlayer = getCurrentPlayer();
-
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="w-full max-w-md" style={{textAlign: 'center'}}>
-          {/* Round Number */}
-          {cloneGameData && cloneGameData.roundNumber > 0 && (
-            <h2 style={{
-              fontSize: '48px',
-              color: 'black',
-              fontWeight: 'bold',
-              margin: '0 0 40px 0',
-              letterSpacing: '2px'
-            }}>
-              Round {cloneGameData.roundNumber}
-            </h2>
-          )}
-
-          {/* Team Name - Always show if player has team */}
-          {currentPlayer?.teamId && (
-            <h1 style={{
-              fontSize: '48px',
-              color: 'black',
-              fontWeight: 'bold',
-              margin: '0 0 60px 0',
-              letterSpacing: '1px'
-            }}>
-              Team {getTeamColor(currentPlayer.teamId)}
-            </h1>
-          )}
-
-          {/* Loading Spinner */}
-          <div style={{display: 'flex', justifyContent: 'center', marginBottom: '60px'}}>
-            <div style={{
-              width: '120px',
-              height: '120px',
-              border: '8px solid rgba(0, 69, 255, 0.2)',
-              borderTop: '8px solid #0045FF',
-              borderRadius: '50%'
-            }} className="animate-spin"></div>
-          </div>
-
-          {/* Waiting Message */}
-          <p style={{
-            color: 'black',
-            fontSize: '32px',
-            fontWeight: '600',
-            margin: 0,
-            lineHeight: '1.4',
-            maxWidth: '600px',
-            paddingLeft: '20px',
-            paddingRight: '20px'
-          }}>
-            Waiting for the other players to get it together.
-          </p>
-        </div>
-      </div>
+      <LoadingScreen
+        teamId={currentPlayer?.teamId}
+        roundNumber={cloneGameData?.roundNumber}
+      />
     );
   };
 
@@ -1156,131 +1048,77 @@ const CloneGamePlay: React.FC = () => {
           <>
             {cloneGameData.currentQuestion && !cloneGameData.playerResponse && !hasSubmittedResponse ? (
               // Question asked, haven't responded yet
-              renderConsistentScreen(
-                'YOUR TURN',
-                <>
-                  {/* Round and Team Info */}
-                  <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                    <p style={{
-                      fontSize: '18px',
-                      color: 'black',
-                      margin: '0 0 15px 0',
-                      fontWeight: '600'
-                    }}>Round {cloneGameData.roundNumber}</p>
-
-                    {/* Team Indicator */}
-                    {(() => {
-                      const currentPlayer = getCurrentPlayer();
-                      if (currentPlayer?.teamId) {
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <img
-                              src={getTeamImage(currentPlayer.teamId)}
-                              alt={`Team ${getTeamColor(currentPlayer.teamId)}`}
-                              style={{
-                                height: '120px',
-                                width: 'auto',
-                                objectFit: 'contain'
-                              }}
-                            />
-                            <p style={{
-                              fontSize: '24px',
-                              color: 'black',
-                              fontWeight: 'bold',
-                              margin: 0
-                            }}>
-                              Team {getTeamColor(currentPlayer.teamId)}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-
-                  {/* Question */}
-                  <p style={{
-                    fontSize: '20px',
-                    color: 'black',
-                    fontStyle: 'italic',
-                    textAlign: 'center',
-                    marginBottom: '20px',
-                    lineHeight: '1.4'
-                  }}>
-                    &ldquo;{cloneGameData.currentQuestion}&rdquo;
-                  </p>
-                </>,
-                {
+              <ScreenWrapper
+                title="YOUR TURN"
+                bottomButton={{
                   text: 'Choose Response',
                   onClick: () => setShowAnswerInterface(true),
                   disabled: false,
                   loading: false
-                }
-              )
-            ) : (
-              // Waiting for question OR already responded - show loading screen
-              <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
-                <div className="w-full max-w-md" style={{ textAlign: 'center' }}>
-                  {/* Round Number */}
-                  <h2 style={{
-                    fontSize: '48px',
+                }}
+              >
+                {/* Round and Team Info */}
+                <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+                  <p style={{
+                    fontSize: '18px',
                     color: 'black',
-                    fontWeight: 'bold',
-                    margin: '0 0 40px 0',
-                    letterSpacing: '2px'
-                  }}>Round {cloneGameData.roundNumber}</h2>
+                    margin: '0 0 15px 0',
+                    fontWeight: '600'
+                  }}>Round {cloneGameData.roundNumber}</p>
 
-                  {/* Team Name - Always show if player has team */}
+                  {/* Team Indicator */}
                   {(() => {
                     const currentPlayer = getCurrentPlayer();
                     if (currentPlayer?.teamId) {
                       return (
-                        <h1 style={{
-                          fontSize: '48px',
-                          color: 'black',
-                          fontWeight: 'bold',
-                          margin: '0 0 60px 0',
-                          letterSpacing: '1px'
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '10px'
                         }}>
-                          Team {getTeamColor(currentPlayer.teamId)}
-                        </h1>
+                          <img
+                            src={getTeamImage(currentPlayer.teamId)}
+                            alt={`Team ${getTeamColor(currentPlayer.teamId)}`}
+                            style={{
+                              height: '120px',
+                              width: 'auto',
+                              objectFit: 'contain'
+                            }}
+                          />
+                          <p style={{
+                            fontSize: '24px',
+                            color: 'black',
+                            fontWeight: 'bold',
+                            margin: 0
+                          }}>
+                            Team {getTeamColor(currentPlayer.teamId)}
+                          </p>
+                        </div>
                       );
                     }
                     return null;
                   })()}
-
-                  {/* Loading Spinner and Message - Centered */}
-                  <div style={{ padding: '0px 20px' }}>
-                    <div style={{display: 'flex', justifyContent: 'center', marginBottom: '60px'}}>
-                      <div style={{
-                        width: '120px',
-                        height: '120px',
-                        border: '8px solid rgba(0, 69, 255, 0.2)',
-                        borderTop: '8px solid #0045FF',
-                        borderRadius: '50%'
-                      }} className="animate-spin"></div>
-                    </div>
-
-                    <p style={{
-                      fontSize: '32px',
-                      color: 'black',
-                      fontWeight: '600',
-                      margin: 0,
-                      lineHeight: '1.4',
-                      maxWidth: '600px',
-                      paddingLeft: '20px',
-                      paddingRight: '20px'
-                    }}>
-                      Waiting for the other players to get it together.
-                    </p>
-                  </div>
                 </div>
-              </div>
+
+                {/* Question */}
+                <p style={{
+                  fontSize: '20px',
+                  color: 'black',
+                  fontStyle: 'italic',
+                  textAlign: 'center',
+                  marginBottom: '20px',
+                  lineHeight: '1.4'
+                }}>
+                  &ldquo;{cloneGameData.currentQuestion}&rdquo;
+                </p>
+              </ScreenWrapper>
+            ) : (
+              // Waiting for question OR already responded - show loading screen
+              <LoadingScreen
+                teamId={getCurrentPlayer()?.teamId}
+                roundNumber={cloneGameData.roundNumber}
+              />
             )}
           </>
         )}

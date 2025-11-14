@@ -52,6 +52,20 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   const [isJoined, setIsJoined] = useState<boolean>(false);
   const [members, setMembers] = useState<Member[]>([]);
 
+  // Random funny loading message
+  const funnyMessages = [
+    "Rounding up the suspects...",
+    "Teaching pigs to talk...",
+    "Cloning some bacon...",
+    "Who's the real pig?...",
+    "Gathering the imposters...",
+    "Finding the fakes..."
+  ];
+  const randomMessage = React.useMemo(() =>
+    funnyMessages[Math.floor(Math.random() * funnyMessages.length)],
+    []
+  );
+
   // Check if player has already joined this room
   useEffect(() => {
     const storedPlayerId = localStorage.getItem(`playerId_${roomId}`);
@@ -406,39 +420,79 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
     <div className="min-h-screen flex items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
       <div className="w-full max-w-md">
         <div style={{textAlign: 'center', padding: '60px 20px'}}>
-          {/* Loading Spinner */}
-          <div style={{display: 'flex', justifyContent: 'center', marginBottom: '40px'}}>
+          {/* Funny Dancing Dots */}
+          <div style={{display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '15px', height: '80px', marginBottom: '50px'}}>
             <div style={{
-              width: '100px',
-              height: '100px',
-              border: '6px solid rgba(0, 69, 255, 0.2)',
-              borderTop: '6px solid #0045FF',
-              borderRadius: '50%'
-            }} className="animate-spin"></div>
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#0045FF',
+              borderRadius: '50%',
+              animation: 'bounce 0.6s ease-in-out infinite'
+            }}></div>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#0045FF',
+              borderRadius: '50%',
+              animation: 'bounce 0.6s ease-in-out 0.2s infinite'
+            }}></div>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              backgroundColor: '#0045FF',
+              borderRadius: '50%',
+              animation: 'bounce 0.6s ease-in-out 0.4s infinite'
+            }}></div>
           </div>
 
-          {/* Waiting Message */}
+          {/* Funny Waiting Message */}
           <p style={{
-            color: 'black',
-            fontSize: '28px',
-            fontWeight: '600',
+            color: '#0045FF',
+            fontSize: '32px',
+            fontWeight: '700',
             margin: 0,
-            lineHeight: '1.5'
+            lineHeight: '1.5',
+            fontFamily: 'var(--font-ojuju), sans-serif',
+            animation: 'wiggle 1s ease-in-out infinite'
           }}>
-            Waiting for the game to start...
+            {randomMessage}
           </p>
 
           {/* Player Count */}
           {members.length > 0 && (
             <p style={{
               color: 'black',
-              opacity: 0.8,
-              fontSize: '18px',
-              marginTop: '20px'
+              opacity: 0.7,
+              fontSize: '20px',
+              marginTop: '25px',
+              fontWeight: '500'
             }}>
-              {members.length} player{members.length !== 1 ? 's' : ''} in lobby
+              {members.length} clone{members.length !== 1 ? 's' : ''} assembled 🐷
             </p>
           )}
+
+          {/* Animation styles */}
+          <style jsx>{`
+            @keyframes bounce {
+              0%, 100% {
+                transform: translateY(0);
+              }
+              50% {
+                transform: translateY(-50px);
+              }
+            }
+            @keyframes wiggle {
+              0%, 100% {
+                transform: rotate(0deg);
+              }
+              25% {
+                transform: rotate(-2deg);
+              }
+              75% {
+                transform: rotate(2deg);
+              }
+            }
+          `}</style>
         </div>
       </div>
     </div>
