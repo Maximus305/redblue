@@ -159,11 +159,8 @@ export class RedBlueGameService {
       };
 
       await setDoc(roomRef, roomData);
-
-      console.log(`✅ RedBlue room created: ${roomId}`);
       return roomId;
     } catch (error) {
-      console.error('Error creating RedBlue room:', error);
       throw error;
     }
   }
@@ -193,8 +190,8 @@ export class RedBlueGameService {
       const players: RedBluePlayer[] = members.map(member => ({
         id: member.memberId,
         name: member.displayName,
-        avatar: member.avatar,
-        color: member.color,
+        avatar: '',
+        color: '#FF6B6B',
         traits: [],
         score: 0,
         isHost: member.role === 'host',
@@ -943,20 +940,6 @@ export class RedBlueGameService {
   }
 
   /**
-   * Load calibration questions from local JSON file
-   */
-  private static async loadCalibrationQuestions(): Promise<PreassignedQuestion[]> {
-    try {
-      // Import questions from local file
-      const questions = await import('@/data/questions/calibrationQuestions.json');
-      return questions.default || questions;
-    } catch (error) {
-      console.error('Error loading calibration questions:', error);
-      return [];
-    }
-  }
-
-  /**
    * Generic deterministic shuffle using Fisher-Yates algorithm
    */
   private static shuffleArray<T>(array: T[], seed: string): T[] {
@@ -1047,18 +1030,6 @@ export class RedBlueGameService {
 
   private static generatePersonaAvoid(): string {
     return 'Generic responses, inconsistency with selected traits';
-  }
-
-  private static getRandomQuestion(): string {
-    // Placeholder - in real app, fetch from topic pack
-    const questions = [
-      "What's your most controversial food opinion?",
-      "If you could have dinner with any historical figure, who would it be?",
-      "What's a skill you wish you had?",
-      "What's your go-to karaoke song?",
-      "What's the worst fashion trend you participated in?"
-    ];
-    return questions[Math.floor(Math.random() * questions.length)];
   }
 
   private static async generateAIAnswer(
