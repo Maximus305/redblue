@@ -45,18 +45,18 @@ export interface Room {
   hostId?: string;
 }
 
-// Generate room code like "ABCD-EFGH"
+// Generate room code like "abcd-efgh" (lowercase letters only)
 function generateRoomCode(): string {
-  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const characters = 'abcdefghjkmnpqrstuvwxyz'; // Lowercase letters, removed similar looking (l, o, i)
   let code = '';
-  
+
   for (let segment = 0; segment < 2; segment++) {
     for (let i = 0; i < 4; i++) {
       code += characters[Math.floor(Math.random() * characters.length)];
     }
     if (segment === 0) code += '-';
   }
-  
+
   return code;
 }
 

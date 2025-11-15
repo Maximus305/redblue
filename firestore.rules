@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Rooms - anyone can read, only authenticated users can write
+    match /rooms/{roomCode} {
+      allow read: if true;
+      allow write: if request.auth != null;
+
+      // Players - authenticated users can read/write their own player doc
+      match /players/{playerId} {
+        allow read: if true;
+        allow create: if request.auth != null && request.auth.uid == playerId;
+        // Allow update only if user is updating their own document
+        // and only specific fields (traits, persona, aiAnswers are generated server-side or by user)
+        allow update: if request.auth != null && request.auth.uid == playerId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'traits',
+            'hasCompletedCalibration',
+            'persona',
+            'aiAnswers',
+            'aiAnswersGeneratedAt'
+          ]);
+        allow delete: if request.auth != null && request.auth.uid == playerId;
+      }
+
+      // Rounds - anyone can read
+      match /rounds/{roundId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+
+        // Votes - authenticated users can read all, write their own
+        match /votes/{playerId} {
+          allow read: if true;
+          allow create: if request.auth != null &&
+            request.auth.uid == playerId &&
+            get(/databases/$(database)/documents/rooms/$(roomCode)).data.status.phase == 'VOTING' &&
+            request.time <= get(/databases/$(database)/documents/rooms/$(roomCode)/rounds/$(roundId)).data.voteDeadline &&
+            get(/databases/$(database)/documents/rooms/$(roomCode)/rounds/$(roundId)).data.speakerId != playerId;
+        }
+      }
+    }
+
+    // Clone games
+    match /clone_games/{roomId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}

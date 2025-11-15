@@ -1,0 +1,67 @@
+[
+  {
+    "id": "calib_001",
+    "text": "How would you describe your communication style?",
+    "choices": ["Direct and to the point", "Playful and casual", "Thoughtful and detailed", "Warm and emotional"],
+    "choiceTraits": [
+      ["confident", "logical", "direct"],
+      ["humorous", "creative", "spontaneous"],
+      ["analytical", "thoughtful", "organized"],
+      ["empathetic", "optimistic", "friendly"]
+    ],
+    "tags": ["personality", "communication"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "calib_002",
+    "text": "When making decisions, you tend to be:",
+    "choices": ["Fast and instinctive", "Careful and methodical", "Creative and unconventional", "Collaborative and consensus-driven"],
+    "choiceTraits": [
+      ["spontaneous", "confident", "adventurous"],
+      ["analytical", "cautious", "practical"],
+      ["creative", "adventurous", "spontaneous"],
+      ["empathetic", "thoughtful", "friendly"]
+    ],
+    "tags": ["decision-making", "personality"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "calib_003",
+    "text": "In social situations, you're most likely to:",
+    "choices": ["Take charge and lead", "Observe and listen first", "Make jokes and lighten the mood", "Connect one-on-one with people"],
+    "choiceTraits": [
+      ["confident", "energetic", "direct"],
+      ["thoughtful", "analytical", "cautious"],
+      ["humorous", "creative", "spontaneous"],
+      ["empathetic", "friendly", "warm"]
+    ],
+    "tags": ["social", "personality"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "calib_004",
+    "text": "Your ideal work environment is:",
+    "choices": ["Fast-paced and dynamic", "Structured and predictable", "Creative and flexible", "Collaborative and supportive"],
+    "choiceTraits": [
+      ["energetic", "adventurous", "spontaneous"],
+      ["organized", "practical", "analytical"],
+      ["creative", "spontaneous", "adventurous"],
+      ["friendly", "empathetic", "thoughtful"]
+    ],
+    "tags": ["work-style", "personality"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "calib_005",
+    "text": "When facing a problem, you usually:",
+    "choices": ["Jump in and try solutions", "Analyze all angles first", "Look for creative workarounds", "Seek input from others"],
+    "choiceTraits": [
+      ["spontaneous", "confident", "adventurous"],
+      ["analytical", "thoughtful", "cautious"],
+      ["creative", "adventurous", "spontaneous"],
+      ["empathetic", "thoughtful", "collaborative"]
+    ],
+    "tags": ["problem-solving", "personality"],
+    "difficulty": "easy"
+  }
+]

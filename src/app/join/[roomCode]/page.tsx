@@ -1,10 +1,8 @@
 "use client"
 import React, { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
 import {
   doc,
-  getDoc,
   setDoc,
   updateDoc,
   onSnapshot,
@@ -16,11 +14,11 @@ import { signInAnonymously } from 'firebase/auth';
 import { validateRoomId, formatRoomId, tryJoinRoom } from '@/utils/roomUtils';
 
 // ============================================================================
-// TYPES - RedBlue Spec v3.2
+// TYPES
 // ============================================================================
 
 type GamePhase = 'LOBBY' | 'CALIBRATE' | 'ROUND_INTRO' | 'SPEAKER_DECIDE' | 'VOTING' | 'REVEAL' | 'LEADERBOARD' | 'END';
-type ErrorCode = 'ROOM_NOT_FOUND' | 'ROOM_CLOSED' | 'ROOM_FULL' | 'PERMISSION_DENIED' | 'PHASE_INVALID' | 'DEADLINE_PASSED' | 'ALREADY_SET';
+type ErrorCode = 'ROOM_NOT_FOUND' | 'ROOM_CLOSED' | 'ROOM_FULL' | 'PERMISSION_DENIED' | 'PHASE_INVALID' | 'DEADLINE_PASSED' | 'ALREADY_SET' | 'VERSION_MISMATCH';
 
 interface CalibrationQuestion {
   id: string;
@@ -32,7 +30,7 @@ interface CalibrationQuestion {
 }
 
 interface Room {
-  roomId: string;
+  roomCode: string;
   status: {
     phase: GamePhase;
     roundIndex: number;
@@ -73,24 +71,23 @@ interface Round {
   } | null;
 }
 
-// Color options
+// Color options for RB-A
 const COLOR_OPTIONS = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF', '#FF8B94', '#C7CEEA'];
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-interface CloneRoomJoinPageProps {
-  params: Promise<{ roomId: string }>;
+interface JoinPageProps {
+  params: Promise<{ roomCode: string }>;
 }
 
-export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
-  const router = useRouter();
+export default function RedBlueJoinPage({ params }: JoinPageProps) {
   const resolvedParams = use(params);
-  const roomIdParam = resolvedParams.roomId;
+  const roomCodeParam = resolvedParams.roomCode;
 
   // Normalize room code to lowercase with dash
-  const roomCode = formatRoomId(roomIdParam);
+  const roomCode = formatRoomId(roomCodeParam);
 
   // State - exactly 3 subscriptions
   const [room, setRoom] = useState<Room | null>(null);
@@ -180,9 +177,9 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
 
         setRoom(roomData as Room);
         setVerifying(false);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error verifying room:', err);
-        setError(err.message || 'ROOM_NOT_FOUND');
+        setError(err instanceof Error ? err.message : 'ROOM_NOT_FOUND');
         setVerifying(false);
       }
     };
@@ -313,7 +310,6 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
       });
 
       localStorage.setItem(`playerId_${roomCode}`, playerId);
-      localStorage.setItem(`playerName_${roomCode}`, name.trim());
       setMyId(playerId);
 
       console.log(`✅ Joined room ${roomCode} as ${playerId}`);
@@ -378,7 +374,8 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
     setError('');
 
     try {
-      // Call setSpeakerChoice function (temporary direct write)
+      // Call setSpeakerChoice function
+      // For now, write directly (replace with callable function later)
       await updateDoc(doc(db, 'rooms', roomCode, 'rounds', currentRound.id), {
         speakerChoice: choice,
         ...(choice === 'Self' && selfAnswer ? { selfAnswer } : {})
@@ -479,7 +476,8 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
       PERMISSION_DENIED: 'Permission denied.',
       PHASE_INVALID: 'Invalid game phase.',
       DEADLINE_PASSED: 'Voting closed.',
-      ALREADY_SET: 'Choice already made.'
+      ALREADY_SET: 'Choice already made.',
+      VERSION_MISMATCH: 'Version mismatch. Please refresh.'
     };
 
     return messages[code as ErrorCode] || code;
@@ -491,11 +489,10 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
 
   if (currentScreen === 'VERIFYING') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <div className="font-mono text-xl font-bold" style={{color: 'black'}}>VERIFYING ROOM...</div>
-          <div className="text-sm mt-2" style={{color: 'black', opacity: 0.8}}>Room: {roomCode}</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg">Verifying room...</p>
         </div>
       </div>
     );
@@ -503,34 +500,18 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
 
   if (currentScreen === 'ERROR') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div style={{
-          maxWidth: '400px',
-          width: '100%',
-          padding: '40px',
-          margin: '20px'
-        }}>
-          <div className="flex flex-col items-center justify-center">
-            <div className="text-red-400 text-6xl mb-4">⚠️</div>
-            <div className="font-bold text-xl mb-2" style={{color: 'black'}}>CONNECTION ERROR</div>
-            <div className="text-center mb-6" style={{color: 'black'}}>{getErrorMessage(error)}</div>
-            <div className="text-sm mb-4" style={{color: 'black'}}>Room: {roomCode}</div>
-            <button
-              onClick={() => router.push('/')}
-              style={{
-                backgroundColor: '#0045FF',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '50px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold'
-              }}
-            >
-              Return Home
-            </button>
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold mb-2">Connection Error</h1>
+          <p className="text-gray-600 mb-4">{getErrorMessage(error)}</p>
+          <p className="text-sm text-gray-500 mb-6">Room code: {roomCode}</p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+          >
+            Return Home
+          </button>
         </div>
       </div>
     );
@@ -539,137 +520,62 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   // RB-A: Join
   if (currentScreen === 'RB-A') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="w-full max-w-md">
-          {/* Header */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingTop: '40px',
-            paddingBottom: '20px'
-          }}>
-            <img
-              src="/PigImage.png"
-              alt="RedBlue"
-              style={{
-                width: '300px',
-                height: 'auto',
-                marginBottom: '20px'
-              }}
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
+          <h1 className="text-3xl font-bold text-center mb-2">Join RedBlue</h1>
+          <p className="text-center text-gray-600 mb-6">Enter the code and your name.</p>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Room Code</label>
+            <input
+              type="text"
+              value={roomCode}
+              disabled
+              className="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg text-center text-xl font-mono"
             />
-            <h1 style={{
-              fontSize: '48px',
-              fontWeight: '700',
-              color: '#0045FF',
-              textAlign: 'center',
-              margin: 0,
-              letterSpacing: '2px',
-              fontFamily: 'var(--font-ojuju), sans-serif'
-            }}>LET&apos;S PLAY REDBLUE</h1>
           </div>
 
-          <div style={{padding: '20px 40px 40px 40px'}}>
-            <div style={{textAlign: 'center', marginBottom: '30px'}}>
-              <p style={{
-                fontSize: '20px',
-                fontWeight: '500',
-                color: 'black',
-                margin: 0
-              }}>Put your name or a fun nickname</p>
-            </div>
-
-            <div style={{marginBottom: '20px'}}>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !loading && handleJoin()}
-                placeholder="Your name..."
-                style={{
-                  width: '100%',
-                  padding: '20px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '12px',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '24px',
-                  color: 'black',
-                  textAlign: 'center',
-                  boxSizing: 'border-box'
-                }}
-                autoFocus
-                disabled={loading}
-                maxLength={20}
-              />
-            </div>
-
-            {/* Color picker */}
-            <div style={{marginBottom: '30px'}}>
-              <p style={{textAlign: 'center', marginBottom: '15px', color: 'black', fontSize: '16px'}}>Pick a color</p>
-              <div style={{display: 'flex', gap: '12px', justifyContent: 'center'}}>
-                {COLOR_OPTIONS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    style={{
-                      width: '50px',
-                      height: '50px',
-                      borderRadius: '50%',
-                      border: selectedColor === color ? '4px solid #0045FF' : '2px solid transparent',
-                      backgroundColor: color,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <div style={{
-                marginBottom: '30px',
-                padding: '15px',
-                backgroundColor: '#fee',
-                borderRadius: '8px'
-              }}>
-                <p style={{fontSize: '16px', color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
-              </div>
-            )}
-
-            {name.trim() && (
-              <button
-                onClick={handleJoin}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  backgroundColor: loading ? 'rgba(0, 69, 255, 0.5)' : '#0045FF',
-                  color: 'white',
-                  padding: '20px',
-                  borderRadius: '50px',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '10px',
-                  letterSpacing: '0.5px'
-                }}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>JOINING...</span>
-                  </>
-                ) : (
-                  <span>JOIN REDBLUE GAME</span>
-                )}
-              </button>
-            )}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">Your Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name..."
+              className="w-full p-3 border border-gray-300 rounded-lg text-lg"
+              maxLength={20}
+            />
           </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">Pick a Color</label>
+            <div className="flex gap-3">
+              {COLOR_OPTIONS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className={`w-12 h-12 rounded-full transition-all ${
+                    selectedColor === color ? 'ring-4 ring-blue-500 ring-offset-2' : ''
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {getErrorMessage(error)}
+            </div>
+          )}
+
+          <button
+            onClick={handleJoin}
+            disabled={loading || !name.trim()}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+          >
+            {loading ? 'Joining...' : 'Join'}
+          </button>
         </div>
       </div>
     );
@@ -680,15 +586,15 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
     const allAnswered = Object.keys(calibrationAnswers).length === 3;
 
     return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 to-pink-50 p-6">
         <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold mb-2" style={{color: '#0045FF'}}>Calibration</h1>
-          <p className="text-gray-700 mb-6 text-lg">Answer these questions to help us understand you</p>
+          <h1 className="text-3xl font-bold mb-2">Calibration</h1>
+          <p className="text-gray-600 mb-6">Answer these questions to help us understand you</p>
 
           <div className="flex-1 overflow-auto mb-6 space-y-6">
             {calibrationQuestions.map((question, questionIndex) => (
-              <div key={question.id} style={{backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
-                <p className="text-lg font-semibold mb-4" style={{color: '#000'}}>
+              <div key={question.id} className="bg-white rounded-lg p-6 shadow-md">
+                <p className="text-lg font-semibold mb-4">
                   {questionIndex + 1}. {question.text}
                 </p>
 
@@ -705,19 +611,11 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
                             [questionIndex]: choiceIndex
                           });
                         }}
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          borderRadius: '12px',
-                          fontWeight: '600',
-                          fontSize: '16px',
-                          textAlign: 'left',
-                          transition: 'all 0.2s',
-                          backgroundColor: isSelected ? '#0045FF' : 'white',
-                          color: isSelected ? 'white' : '#000',
-                          border: isSelected ? '2px solid #0045FF' : '2px solid #ddd',
-                          cursor: 'pointer'
-                        }}
+                        className={`w-full p-4 rounded-lg font-medium text-left transition-all ${
+                          isSelected
+                            ? 'bg-purple-600 text-white border-2 border-purple-700'
+                            : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-purple-400'
+                        }`}
                       >
                         {choice}
                       </button>
@@ -728,32 +626,22 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
             ))}
           </div>
 
-          <div className="text-center text-sm mb-4" style={{color: '#666'}}>
+          <div className="text-center text-sm text-gray-600 mb-4">
             Answered: {Object.keys(calibrationAnswers).length} / 3
           </div>
 
           {error && (
-            <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {getErrorMessage(error)}
             </div>
           )}
 
           <button
             onClick={handleSubmitTraits}
             disabled={loading || !allAnswered}
-            style={{
-              width: '100%',
-              padding: '18px',
-              backgroundColor: (loading || !allAnswered) ? '#ccc' : '#0045FF',
-              color: 'white',
-              borderRadius: '50px',
-              border: 'none',
-              cursor: (loading || !allAnswered) ? 'not-allowed' : 'pointer',
-              fontSize: '18px',
-              fontWeight: 'bold'
-            }}
+            className="w-full py-4 bg-purple-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
           >
-            {loading ? 'SUBMITTING...' : 'SUBMIT'}
+            {loading ? 'Submitting...' : 'Submit'}
           </button>
         </div>
       </div>
@@ -763,41 +651,32 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   // RB-C: Wait/Status
   if (currentScreen === 'RB-C') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="text-center p-6">
-          <h1 className="text-5xl font-bold mb-6" style={{color: '#0045FF'}}>RedBlue</h1>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 p-6">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-4">RedBlue</h1>
 
           {/* Topic Badge (Repo B v3.4) */}
           {room?.topicPack && (
             <div className="mb-6">
-              <div style={{
-                display: 'inline-block',
-                padding: '8px 20px',
-                backgroundColor: '#E0E7FF',
-                borderRadius: '20px',
-                border: '2px solid #6366F1'
-              }}>
-                <p className="text-sm font-semibold" style={{color: '#4338CA'}}>
+              <span className="inline-block px-5 py-2 bg-indigo-100 border-2 border-indigo-500 rounded-full">
+                <p className="text-sm font-semibold text-indigo-900">
                   Topic: {room.topicPack}
                 </p>
-              </div>
+              </span>
             </div>
           )}
 
           <div className="mb-8">
-            <p className="text-lg mb-2" style={{color: '#666'}}>Phase</p>
-            <p className="text-4xl font-bold" style={{color: 'black'}}>{room?.status.phase || 'LOBBY'}</p>
+            <p className="text-lg text-gray-600 mb-2">Phase</p>
+            <p className="text-3xl font-bold">{room?.status.phase || 'LOBBY'}</p>
           </div>
           {currentRound && (
             <div>
-              <p className="text-xl" style={{color: '#666'}}>
+              <p className="text-gray-600">
                 {isSpeaker ? "You're up!" : 'Watch and wait...'}
               </p>
             </div>
           )}
-          <div className="mt-8">
-            <p className="text-sm" style={{color: '#999'}}>{players.length} player{players.length !== 1 ? 's' : ''} in room</p>
-          </div>
         </div>
       </div>
     );
@@ -806,62 +685,44 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   // RB-D: Speaker Decide
   if (currentScreen === 'RB-D') {
     return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 to-pink-50 p-6">
         <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold mb-4" style={{color: '#0045FF'}}>Your Turn</h1>
+          <h1 className="text-3xl font-bold mb-4">Your Turn</h1>
 
           {/* Topic Badge (Repo B v3.4) */}
           {room?.topicPack && (
             <div className="mb-4">
-              <div style={{
-                display: 'inline-block',
-                padding: '6px 16px',
-                backgroundColor: '#E0E7FF',
-                borderRadius: '16px',
-                border: '2px solid #6366F1'
-              }}>
-                <p className="text-xs font-semibold" style={{color: '#4338CA'}}>
+              <span className="inline-block px-4 py-1.5 bg-indigo-100 border-2 border-indigo-500 rounded-full">
+                <p className="text-xs font-semibold text-indigo-900">
                   Topic: {room.topicPack}
                 </p>
-              </div>
+              </span>
             </div>
           )}
 
-          <p className="text-2xl mb-8" style={{color: 'black'}}>{currentRound?.questionText}</p>
+          <p className="text-xl text-gray-700 mb-8">{currentRound?.questionText}</p>
 
           <div className="flex-1 mb-6">
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
-                onClick={() => !currentRound?.speakerChoice && handleSpeakerChoice('AI')}
+                onClick={() => handleSpeakerChoice('AI')}
                 disabled={currentRound?.speakerChoice !== null}
-                style={{
-                  padding: '60px 20px',
-                  borderRadius: '16px',
-                  fontWeight: 'bold',
-                  fontSize: '32px',
-                  backgroundColor: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? '#9333EA' : 'white',
-                  color: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? 'white' : 'black',
-                  border: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? 'none' : '3px solid #ddd',
-                  cursor: currentRound?.speakerChoice ? 'not-allowed' : 'pointer',
-                  opacity: currentRound?.speakerChoice && currentRound.speakerChoice !== 'AI' ? 0.5 : 1
-                }}
+                className={`p-8 rounded-lg font-bold text-2xl transition-all ${
+                  speakerChoice === 'AI'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white border-2 border-gray-300 text-gray-700'
+                } disabled:opacity-50`}
               >
                 AI
               </button>
               <button
-                onClick={() => !currentRound?.speakerChoice && handleSpeakerChoice('Self')}
+                onClick={() => handleSpeakerChoice('Self')}
                 disabled={currentRound?.speakerChoice !== null}
-                style={{
-                  padding: '60px 20px',
-                  borderRadius: '16px',
-                  fontWeight: 'bold',
-                  fontSize: '32px',
-                  backgroundColor: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? '#10B981' : 'white',
-                  color: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? 'white' : 'black',
-                  border: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? 'none' : '3px solid #ddd',
-                  cursor: currentRound?.speakerChoice ? 'not-allowed' : 'pointer',
-                  opacity: currentRound?.speakerChoice && currentRound.speakerChoice !== 'Self' ? 0.5 : 1
-                }}
+                className={`p-8 rounded-lg font-bold text-2xl transition-all ${
+                  speakerChoice === 'Self'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white border-2 border-gray-300 text-gray-700'
+                } disabled:opacity-50`}
               >
                 Self
               </button>
@@ -881,16 +742,16 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
             )}
 
             {speakerChoice === 'AI' && currentRound?.aiAnswerPrivate && currentRound.aiAnswerPrivateFor === me?.id && (
-              <div style={{padding: '20px', backgroundColor: '#F3E8FF', border: '2px solid #9333EA', borderRadius: '12px'}}>
-                <p style={{fontSize: '14px', fontWeight: '600', color: '#581C87', marginBottom: '10px'}}>AI Preview (only you see this):</p>
-                <p style={{fontSize: '18px', color: 'black'}}>{currentRound.aiAnswerPrivate}</p>
+              <div className="p-4 bg-purple-50 border-2 border-purple-200 rounded-lg">
+                <p className="text-sm font-medium text-purple-900 mb-2">AI Preview (only you see this):</p>
+                <p className="text-lg">{currentRound.aiAnswerPrivate}</p>
               </div>
             )}
           </div>
 
           {error && (
-            <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {getErrorMessage(error)}
             </div>
           )}
         </div>
@@ -901,60 +762,52 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   // RB-E: Vote
   if (currentScreen === 'RB-E') {
     return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-50 to-pink-50 p-6">
         <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold text-center mb-6" style={{color: '#0045FF'}}>Vote</h1>
-          <p className="text-2xl text-center mb-12" style={{color: 'black'}}>Was that AI or Self?</p>
+          <h1 className="text-3xl font-bold text-center mb-6">Vote</h1>
+          <p className="text-xl text-center mb-12">Was that AI or Self?</p>
 
           <div className="flex-1 flex flex-col gap-6 justify-center">
             <button
-              onClick={() => !hasVoted && isVotingOpen && handleVote('AI')}
+              onClick={() => handleVote('AI')}
               disabled={hasVoted || !isVotingOpen}
-              style={{
-                padding: '80px 40px',
-                borderRadius: '16px',
-                fontWeight: 'bold',
-                fontSize: '48px',
-                backgroundColor: (hasVoted && myVote === 'AI') ? '#9333EA' : (hasVoted || !isVotingOpen) ? '#ddd' : '#A855F7',
-                color: (hasVoted || !isVotingOpen) ? '#999' : 'white',
-                border: 'none',
-                cursor: (hasVoted || !isVotingOpen) ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
+              className={`py-16 rounded-lg font-bold text-4xl transition-all ${
+                hasVoted && myVote === 'AI'
+                  ? 'bg-purple-600 text-white'
+                  : hasVoted || !isVotingOpen
+                    ? 'bg-gray-300 text-gray-500'
+                    : 'bg-purple-500 text-white hover:bg-purple-600'
+              } disabled:cursor-not-allowed`}
             >
               {hasVoted && myVote === 'AI' ? '✓ AI' : 'AI'}
             </button>
 
             <button
-              onClick={() => !hasVoted && isVotingOpen && handleVote('Self')}
+              onClick={() => handleVote('Self')}
               disabled={hasVoted || !isVotingOpen}
-              style={{
-                padding: '80px 40px',
-                borderRadius: '16px',
-                fontWeight: 'bold',
-                fontSize: '48px',
-                backgroundColor: (hasVoted && myVote === 'Self') ? '#10B981' : (hasVoted || !isVotingOpen) ? '#ddd' : '#34D399',
-                color: (hasVoted || !isVotingOpen) ? '#999' : 'white',
-                border: 'none',
-                cursor: (hasVoted || !isVotingOpen) ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
+              className={`py-16 rounded-lg font-bold text-4xl transition-all ${
+                hasVoted && myVote === 'Self'
+                  ? 'bg-green-600 text-white'
+                  : hasVoted || !isVotingOpen
+                    ? 'bg-gray-300 text-gray-500'
+                    : 'bg-green-500 text-white hover:bg-green-600'
+              } disabled:cursor-not-allowed`}
             >
               {hasVoted && myVote === 'Self' ? '✓ Self' : 'Self'}
             </button>
           </div>
 
           {hasVoted && (
-            <p className="text-center text-xl mt-6" style={{color: '#0045FF', fontWeight: 'bold'}}>Vote locked ✓</p>
+            <p className="text-center text-lg text-gray-600 mt-6">Vote locked</p>
           )}
 
           {!isVotingOpen && !hasVoted && (
-            <p className="text-center text-xl mt-6" style={{color: '#c00', fontWeight: 'bold'}}>Voting closed</p>
+            <p className="text-center text-lg text-red-600 mt-6">Voting closed</p>
           )}
 
           {error && (
-            <div style={{marginTop: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
+              {getErrorMessage(error)}
             </div>
           )}
         </div>
@@ -968,36 +821,36 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
     const fooledMajority = currentRound?.result?.fooledMajority || false;
 
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 p-6">
         <div className="text-center">
-          <h1 className="text-5xl font-bold mb-8" style={{color: '#0045FF'}}>Result</h1>
+          <h1 className="text-4xl font-bold mb-8">Result</h1>
 
           <div className="mb-8">
-            <p className="text-2xl mb-4" style={{color: '#666'}}>It was</p>
-            <p className="text-8xl font-bold mb-8" style={{color: 'black'}}>{currentRound?.speakerChoice}</p>
+            <p className="text-xl text-gray-600 mb-2">It was</p>
+            <p className="text-7xl font-bold mb-6">{currentRound?.speakerChoice}</p>
 
             {isSpeaker ? (
               <div>
-                <p className="text-3xl mb-4" style={{color: 'black'}}>
+                <p className="text-2xl mb-4">
                   {fooledMajority ? "You fooled them! ✨" : "They guessed it!"}
                 </p>
-                <p className="text-5xl font-bold" style={{color: fooledMajority ? '#10B981' : '#666'}}>
+                <p className="text-4xl font-bold">
                   {fooledMajority ? "+1 point" : "No points"}
                 </p>
               </div>
             ) : (
               <div>
-                <p className="text-3xl mb-4" style={{color: 'black'}}>
+                <p className="text-2xl mb-4">
                   {wasCorrect ? "You were right! ✅" : "Close! ❌"}
                 </p>
-                <p className="text-5xl font-bold" style={{color: wasCorrect ? '#10B981' : '#666'}}>
+                <p className="text-4xl font-bold">
                   {wasCorrect ? "+1 point" : "No points"}
                 </p>
               </div>
             )}
           </div>
 
-          <p className="text-xl" style={{color: '#666'}}>Waiting for next round...</p>
+          <p className="text-lg text-gray-600">Waiting for next round...</p>
         </div>
       </div>
     );

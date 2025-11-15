@@ -379,7 +379,7 @@ export class CloneGameService {
       await updateDoc(cloneGameRef, {
         players: updatedPlayers,
         gamePhase: hasInconsistencies ? 'clone_creation' : gameData.gamePhase,
-        lastUpdated: serverTimestamp()
+        lastUpdated: serverTimestamp() 
       });
       
       // Also fix lobby member data

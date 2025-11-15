@@ -1,70 +1,101 @@
 // utils/roomUtils.ts
+import { doc, getDoc } from "firebase/firestore";
+import { signInAnonymously } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
 
 /**
  * Generates a random room ID with configurable length
- * Format: XXXX-XXXX where X is an alphanumeric character
+ * Format: xxxx-xxxx where x is a lowercase letter
  */
 export function generateRoomId(segmentLength: number = 4, numberOfSegments: number = 2): string {
-    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed similar looking characters (0, 1, I, O)
+    const characters = 'abcdefghjkmnpqrstuvwxyz'; // Lowercase letters only, removed similar looking (l, o, i)
     let roomId = '';
-    
+
     for (let segment = 0; segment < numberOfSegments; segment++) {
       for (let i = 0; i < segmentLength; i++) {
         const randomIndex = Math.floor(Math.random() * characters.length);
         roomId += characters[randomIndex];
       }
-      
+
       if (segment < numberOfSegments - 1) {
         roomId += '-';
       }
     }
-    
+
     return roomId;
   }
-  
+
   /**
-   * Validates a room ID format
+   * Validates a room ID format - lowercase letters only
    */
   export function validateRoomId(roomId: string): boolean {
-    // Adjust regex based on your desired format
-    const roomIdRegex = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+    const roomIdRegex = /^[a-z]{4}-[a-z]{4}$/;
     return roomIdRegex.test(roomId);
   }
-  
+
   /**
    * Formats a room ID to ensure consistent display
-   * (e.g., converting lowercase to uppercase, adding hyphens if missing)
+   * Normalizes to lowercase and adds dash after 4 chars
    */
   export function formatRoomId(roomId: string | undefined): string {
-    console.log("formatRoomId input:", roomId);
-    
     // Handle undefined or null roomId
     if (!roomId) {
-      console.log("roomId is empty or undefined, returning empty string");
       return '';
     }
-  
-    // Remove any non-alphanumeric characters and convert to uppercase
-    console.log("roomId before cleaning:", roomId);
-    const cleanedId = roomId.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    console.log("cleanedId after replacing non-alphanumeric:", cleanedId);
-  
-    // If we have at least 8 characters, format as XXXX-XXXX
+
+    // Remove any non-letter characters and convert to lowercase
+    const cleanedId = roomId.replace(/[^a-z]/gi, '').toLowerCase();
+
+    // If we have at least 8 characters, format as xxxx-xxxx
     if (cleanedId.length >= 8) {
-      const formatted = `${cleanedId.slice(0, 4)}-${cleanedId.slice(4, 8)}`;
-      console.log("Returning formatted (8+ chars):", formatted);
-      return formatted;
-    } 
-    // If we have at least 4 characters, pad with zeros and format
+      return `${cleanedId.slice(0, 4)}-${cleanedId.slice(4, 8)}`;
+    }
+    // If we have at least 4 characters, format as xxxx-xxxx (pad if needed)
     else if (cleanedId.length >= 4) {
-      const padded = cleanedId.padEnd(8, '0');
-      const formatted = `${padded.slice(0, 4)}-${padded.slice(4, 8)}`;
-      console.log("Returning formatted (4-7 chars, padded):", formatted);
-      return formatted;
+      const padded = cleanedId.padEnd(8, 'a');
+      return `${padded.slice(0, 4)}-${padded.slice(4, 8)}`;
     }
     // If we have less than 4 characters, just return as is
     else {
-      console.log("Returning as is (less than 4 chars):", cleanedId);
       return cleanedId;
     }
+  }
+
+  /**
+   * Normalizes room code input (Repo B spec - Appendix A)
+   * Auto-inserts dash after 4 chars and lowercases
+   */
+  export function normalizeRoomCode(input: string): string {
+    const raw = input.trim().toLowerCase().replace(/[^a-z-]/g, '');
+    return raw.length === 8 && !raw.includes('-')
+      ? `${raw.slice(0, 4)}-${raw.slice(4)}`
+      : raw;
+  }
+
+  /**
+   * Known-good join helper (Repo B spec - Appendix A)
+   * Signs in anonymously BEFORE any Firestore read
+   */
+  export async function tryJoinRoom(roomCodeInput: string): Promise<{ roomCode: string; room: Record<string, unknown> }> {
+    const roomCode = normalizeRoomCode(roomCodeInput);
+
+    // Validate format
+    if (!/^[a-z]{4}-[a-z]{4}$/.test(roomCode)) {
+      throw new Error('INVALID_CODE');
+    }
+
+    // MUST be signed in before reading (Repo B requirement)
+    if (!auth.currentUser) {
+      await signInAnonymously(auth);
+    }
+
+    // Read room document
+    const ref = doc(db, 'rooms', roomCode);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+      throw new Error('ROOM_NOT_FOUND');
+    }
+
+    return { roomCode, room: snap.data() };
   }
