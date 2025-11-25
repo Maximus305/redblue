@@ -46,50 +46,41 @@ export default function NameEntryPage() {
   // Verify room once we have a roomId
   useEffect(() => {
     if (!formattedRoomId) return;
-    
-    // Add a timeout to prevent endless loading
-    const timeoutId = setTimeout(() => {
-      if (verifying) {
-        console.log("Verification timed out after 10 seconds");
-        setVerifying(false);
-        setError("Room verification timed out. Please try again or contact support.");
-      }
-    }, 10000); // 10 second timeout
-    
+
     // Check if room exists and is active
     const verifyRoom = async () => {
       try {
         console.log("Attempting to verify room:", formattedRoomId);
-        
+
         // Look up the room in Firestore
         const roomRef = doc(db, "rooms", formattedRoomId);
         console.log("Room reference created:", roomRef.path);
-        
+
         const roomSnap = await getDoc(roomRef);
         console.log("Room document fetched, exists:", roomSnap.exists());
-        
+
         if (!roomSnap.exists()) {
           console.log("Room not found in database");
           setError("Room not found. Please check the ID and try again.");
           setVerifying(false);
           return;
         }
-        
+
         const roomData = roomSnap.data();
         console.log("Room data retrieved:", roomData);
-        
+
         if (roomData && roomData.active === false) {
           setError("This room is no longer active.");
           setVerifying(false);
           return;
         }
-        
+
         // Check if user has a stored name
         const storedName = localStorage.getItem("agentName");
         if (storedName) {
           setName(storedName);
         }
-        
+
         // Success!
         console.log("Room verified successfully");
         setVerifying(false);
@@ -102,9 +93,6 @@ export default function NameEntryPage() {
     };
 
     verifyRoom();
-    
-    // Clear timeout if component unmounts or verification completes
-    return () => clearTimeout(timeoutId);
   }, [formattedRoomId]);
 
   // Bypass verification for debugging
@@ -253,15 +241,18 @@ export default function NameEntryPage() {
               <button
                 type="submit"
                 disabled={loading || !name.trim()}
-                className="w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all duration-300"
+                className="w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
                 style={{
-                  backgroundColor: '#FDD804',
+                  backgroundColor: loading || !name.trim() ? '#FDD804' : '#FDD804',
                   color: '#000000',
                   borderRadius: '100px',
                   border: 'none',
                   fontWeight: 700,
                   fontSize: '18px',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  padding: '12px 0',
+                  opacity: loading || !name.trim() ? 0.5 : 1,
+                  cursor: loading || !name.trim() ? 'not-allowed' : 'pointer'
                 }}
               >
                 {loading ? (
