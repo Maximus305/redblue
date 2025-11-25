@@ -519,7 +519,12 @@ const fetchPlayerScores = async (): Promise<void> => {
     const agentKey = `${roomId}_${agentSlug}`;
     const agentRef = doc(db, "agents", agentKey);
 
-    const userIsSpy = agentSlug === settings.spyAgent ||
+    // Handle both formats: "dave" or "WHJT-BZRY_dave"
+    const spyAgentSlug = settings.spyAgent?.includes('_')
+      ? settings.spyAgent.split('_')[1]
+      : settings.spyAgent;
+    const userIsSpy = agentSlug === spyAgentSlug ||
+                     agentSlug === settings.spyAgent ||
                      (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
 
     const dataToWrite: Record<string, unknown> = {
