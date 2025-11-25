@@ -157,14 +157,15 @@ export default function NameEntryPage() {
 
   if (verifying) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9FAFB' }}>
         <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
-          <div className="text-zinc-600 font-mono">VERIFYING ROOM...</div>
-          <div className="text-zinc-400 text-sm mt-8">Room ID: {formattedRoomId || roomId || "Unknown"}</div>
-          <button 
+          <Loader2 className="w-12 h-12 animate-spin mb-4" style={{ color: '#FDD804' }} />
+          <div className="font-mono" style={{ color: '#666666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>VERIFYING ROOM...</div>
+          <div className="text-sm mt-8" style={{ color: '#999999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Room ID: {formattedRoomId || roomId || "Unknown"}</div>
+          <button
             onClick={bypassVerification}
-            className="mt-4 text-sm text-blue-500 hover:text-blue-700"
+            className="mt-4 text-sm hover:opacity-80"
+            style={{ color: '#FDD804', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
           >
             Skip verification (debug)
           </button>
@@ -175,23 +176,25 @@ export default function NameEntryPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
-        <div className="bg-white border border-zinc-200 shadow-lg rounded-lg max-w-md w-full p-8">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9FAFB' }}>
+        <div className="max-w-md w-full p-8" style={{ backgroundColor: '#FFFFFF', border: '2px solid #E5E5E5', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
           <div className="flex flex-col items-center justify-center">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-            <div className="text-zinc-800 font-mono text-lg mb-2">MISSION ERROR</div>
-            <div className="text-zinc-600 font-mono text-center mb-6">{error}</div>
-            <div className="text-zinc-400 text-xs mb-4">Room ID: {formattedRoomId || roomId || "Unknown"}</div>
+            <AlertCircle className="w-12 h-12 mb-4" style={{ color: '#FF3B30' }} />
+            <div className="font-mono text-lg mb-2" style={{ color: '#000000', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', fontWeight: 600 }}>MISSION ERROR</div>
+            <div className="font-mono text-center mb-6" style={{ color: '#666666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>{error}</div>
+            <div className="text-xs mb-4" style={{ color: '#999999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Room ID: {formattedRoomId || roomId || "Unknown"}</div>
             <div className="flex space-x-4">
               <button
                 onClick={() => router.push('/')}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all"
+                className="px-6 py-2 hover:opacity-90 transition-all"
+                style={{ backgroundColor: '#FDD804', color: '#000000', borderRadius: '100px', border: 'none', fontWeight: 700, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
               >
                 Return Home
               </button>
               <button
                 onClick={bypassVerification}
-                className="px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-all"
+                className="px-6 py-2 hover:opacity-90 transition-all"
+                style={{ backgroundColor: '#F5F5F5', color: '#000000', borderRadius: '100px', border: 'none', fontWeight: 600, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
               >
                 Try Anyway
               </button>
@@ -203,17 +206,17 @@ export default function NameEntryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: '#F9FAFB' }}>
       <div className={`w-full max-w-md transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-        <div className="bg-white border border-zinc-200 shadow-lg rounded-lg overflow-hidden">
+        <div className="overflow-hidden" style={{ backgroundColor: '#FFFFFF', border: '2px solid #E5E5E5', borderRadius: '20px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
           {/* Header */}
-          <div className="border-b border-zinc-200 p-4 bg-zinc-50">
+          <div className="p-4" style={{ borderBottom: '2px solid #E5E5E5', backgroundColor: '#F5F5F5' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <Shield className="w-5 h-5 text-zinc-700" />
-                <span className="font-mono text-zinc-800">AGENT REGISTRATION</span>
+                <Shield className="w-5 h-5" style={{ color: '#666666' }} />
+                <span className="font-mono" style={{ color: '#000000', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', fontWeight: 600 }}>AGENT REGISTRATION</span>
               </div>
-              <div className="font-mono text-sm text-zinc-500">
+              <div className="font-mono text-sm" style={{ color: '#666666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                 {formattedRoomId || roomId}
               </div>
             </div>
@@ -222,8 +225,8 @@ export default function NameEntryPage() {
           {/* Main Content */}
           <div className="p-8">
             <div className="text-center mb-6">
-              <h1 className="text-xl font-bold mb-1">ENTER YOUR NAME</h1>
-              <p className="text-zinc-500 text-sm">Required to join this mission</p>
+              <h1 className="text-xl font-bold mb-1" style={{ color: '#000000', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>ENTER YOUR NAME</h1>
+              <p className="text-sm" style={{ color: '#666666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Required to join this mission</p>
             </div>
 
             <form onSubmit={handleSubmit}>
@@ -232,7 +235,14 @@ export default function NameEntryPage() {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full p-4 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-zinc-50 font-mono text-lg text-center"
+                  className="w-full p-4 font-mono text-lg text-center focus:outline-none"
+                  style={{
+                    border: '2px solid #E5E5E5',
+                    borderRadius: '16px',
+                    backgroundColor: '#FFFFFF',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    color: '#000000'
+                  }}
                   placeholder="TYPE YOUR NAME"
                   aria-label="Agent Name"
                   required
@@ -243,7 +253,16 @@ export default function NameEntryPage() {
               <button
                 type="submit"
                 disabled={loading || !name.trim()}
-                className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-all duration-300"
+                style={{
+                  backgroundColor: '#FDD804',
+                  color: '#000000',
+                  borderRadius: '100px',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '18px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}
               >
                 {loading ? (
                   <>
@@ -258,8 +277,8 @@ export default function NameEntryPage() {
           </div>
 
           {/* Footer */}
-          <div className="border-t border-zinc-200 p-4 bg-zinc-50">
-            <div className="flex justify-between items-center text-xs font-mono text-zinc-500">
+          <div className="p-4" style={{ borderTop: '2px solid #E5E5E5', backgroundColor: '#F5F5F5' }}>
+            <div className="flex justify-between items-center text-xs font-mono" style={{ color: '#666666', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
               <span>ROOM::{formattedRoomId || roomId}</span>
               <span>STATUS::READY</span>
             </div>

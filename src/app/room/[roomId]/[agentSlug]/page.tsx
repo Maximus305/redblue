@@ -881,15 +881,17 @@ const fetchPlayerScores = async (): Promise<void> => {
                 onClick={handleShowScores}
                 style={{
                   fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#FDD804',
+                  fontWeight: 700,
+                  color: '#000000',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  background: 'none',
+                  background: '#FDD804',
                   border: 'none',
+                  borderRadius: '100px',
+                  padding: '8px 16px',
                   cursor: 'pointer',
                 }}
               >
-                SCORES
+                VIEW SCOREBOARD
               </button>
             </div>
 
