@@ -944,7 +944,8 @@ const fetchPlayerScores = async (): Promise<void> => {
               <div
                 className="p-6"
                 style={{
-                  backgroundColor: '#FDD804',
+                  backgroundColor: '#FFFFFF',
+                  border: '3px solid #E5E7EB',
                   borderRadius: '20px',
                 }}
               >
