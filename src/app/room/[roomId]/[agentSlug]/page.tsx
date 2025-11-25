@@ -370,11 +370,17 @@ const fetchPlayerScores = async (): Promise<void> => {
           setCommonCodeWord(settings.commonCodeWord);
 
           if (currentGameMode === 'spy') {
-            const userIsSpy = agentSlug === settings.spyAgent ||
+            // Check if user is spy - handle both formats: "dave" or "WHJT-BZRY_dave"
+            const spyAgentSlug = settings.spyAgent?.includes('_')
+              ? settings.spyAgent.split('_')[1]
+              : settings.spyAgent;
+            const userIsSpy = agentSlug === spyAgentSlug ||
+                             agentSlug === settings.spyAgent ||
                              (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
             console.log('🔍 SPY DETECTION:', {
               agentSlug,
               spyAgent: settings.spyAgent,
+              spyAgentSlug,
               spyAgents: settings.spyAgents,
               userIsSpy,
               currentGameMode
