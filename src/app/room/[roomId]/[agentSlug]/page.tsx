@@ -549,8 +549,13 @@ const fetchPlayerScores = async (): Promise<void> => {
       if (userIsSpy) {
         setCodeWord('spy');
       }
+
+      // Clear the update flag immediately after successful write
+      // This allows the agent listener to process the Firebase update
+      setIsUpdatingSpyStatus(false);
     } catch (error) {
       console.error('❌ Error updating agent for spy mode:', error);
+      setIsUpdatingSpyStatus(false);
     }
   };
 
