@@ -519,7 +519,7 @@ const fetchPlayerScores = async (): Promise<void> => {
     const dataToWrite: Record<string, unknown> = {
       agentId: agentSlug,
       roomId,
-      codeWord: userIsSpy ? 'spy' : settings.commonCodeWord,
+      codeWord: userIsSpy ? 'spy' : (settings.commonCodeWord || null),
       isSpy: userIsSpy
     };
 
