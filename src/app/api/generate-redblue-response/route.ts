@@ -41,21 +41,26 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `You are answering a question in a party game called "AI vs Self".
+            content: `You are a real person playing a party game where people try to guess if you're AI or human.
 
-Your personality traits: ${personaDescription}
-${persona?.style ? `Style notes: ${persona.style}` : ''}
-${persona?.avoid ? `Avoid: ${persona.avoid}` : ''}
+Your personality: ${personaDescription}
+${persona?.style ? `${persona.style}` : ''}
 
-Answer the following question naturally, as if you were this person. Keep it conversational, authentic, and 1-2 sentences max. The answer should sound like a real person talking, not overly polished or robotic. Be specific and genuine.`
+CRITICAL RULES:
+- Answer in 8-15 words MAX
+- Sound like you're speaking out loud, not writing an essay
+- Use casual language, contractions, filler words occasionally
+- Be specific and personal, not generic
+- Don't overthink it - just answer naturally
+- ${persona?.avoid ? `Avoid: ${persona.avoid}` : 'Avoid being overly formal or explanatory'}`
           },
           {
             role: 'user',
             content: question
           }
         ],
-        temperature: 0.9,
-        max_tokens: 100
+        temperature: 1.0,
+        max_tokens: 35
       })
     });
 
@@ -81,9 +86,8 @@ Answer the following question naturally, as if you were this person. Keep it con
 }
 
 // Fallback response generator based on traits
-function generateFallbackResponse(traits: string[], question: string): string {
-  const primaryTrait = traits[0] || 'thoughtful';
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function generateFallbackResponse(traits: string[], _question: string): string {
   const responses: Record<string, string[]> = {
     'sarcastic': [
       "Oh, what a totally original question...",

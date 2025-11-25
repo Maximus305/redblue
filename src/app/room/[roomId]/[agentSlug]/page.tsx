@@ -1,6 +1,6 @@
 "use client"
-import React, { useState, useEffect, use } from "react";
-import { Shield, Loader2, Crown, AlertCircle, Eye, ClipboardList, X } from 'lucide-react';
+import React, { useState, useEffect, use, useMemo } from "react";
+import { Loader2, Crown, AlertCircle, Eye, X } from 'lucide-react';
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -11,11 +11,10 @@ import {
   query,
   getDocs,
   where,
-  
-  
+
+
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -112,32 +111,54 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [playerScores, setPlayerScores] = useState<PlayerScore[]>([]);
   const [loadingScores, setLoadingScores] = useState(false);
   const [hasBeenRemoved, setHasBeenRemoved] = useState(false);
-  const [iconSize, setIconSize] = useState(80);
-  
+  // const [iconSize, setIconSize] = useState(80);
+  const [commonCodeWord, setCommonCodeWord] = useState<string | undefined>(undefined);
+  const [isUpdatingSpyStatus, setIsUpdatingSpyStatus] = useState(false);
+
   const allCodeWords = [
-    'Atlas', 'Balloon', 'Bamboo', 'Basket',
-    'Bell', 'Boat', 'Bullet', 'Camera',
-    'Castle', 'Chair', 'Clock', 'Diamond',
-    'Hammer', 'Lantern', 'Lock', 'Ring',
-    'Rocket', 'Car', 'Hack', 'Key',
-    'Bike', 'Gun', 'Rubiks'
+    'Atlas', 'Balloon', 'Bamboo', 'Basket', 'Barrel',
+    'Bell', 'Bike', 'Boat', 'Bow', 'Briefcase',
+    'Bullet', 'Camera', 'Car', 'Castle', 'Chair',
+    'Clock', 'Crate', 'Crown', 'Diamond', 'Dice',
+    'Door', 'Envelope', 'Gun', 'Hack', 'Hammer',
+    'Key', 'Lantern', 'Lock', 'Marker', 'Max',
+    'Outlet', 'Paintbrush', 'Racecar', 'Ring', 'Rocket',
+    'Rope', 'Rubiks', 'Tent', 'Tire', 'Wrench'
   ];
 
-  // Add this useEffect to handle responsive icon sizing:
-  useEffect(() => {
-    const updateIconSize = () => {
-      const width = window.innerWidth;
-      if (width < 640) setIconSize(36);
-      else if (width < 768) setIconSize(56);
-      else if (width < 1024) setIconSize(72);
-      else setIconSize(80);
-    };
+  // Generate 6 random words including the common code word for spy view
+  const spyCodeWords = useMemo(() => {
+    if (!commonCodeWord || commonCodeWord === 'spy') {
+      // Fallback: return 6 random words if no common code word
+      const shuffled = [...allCodeWords].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, 6);
+    }
 
-    updateIconSize();
-    window.addEventListener('resize', updateIconSize);
-    return () => window.removeEventListener('resize', updateIconSize);
-  }, []);
-  
+    // Get 5 random words excluding the common code word
+    const otherWords = allCodeWords.filter(w => w !== commonCodeWord);
+    const shuffled = otherWords.sort(() => Math.random() - 0.5);
+    const randomFive = shuffled.slice(0, 5);
+
+    // Combine with common code word and shuffle again
+    const result = [...randomFive, commonCodeWord].sort(() => Math.random() - 0.5);
+    return result;
+  }, [commonCodeWord]);
+
+  // Add this useEffect to handle responsive icon sizing:
+  // useEffect(() => {
+  //   const updateIconSize = () => {
+  //     const width = window.innerWidth;
+  //     if (width < 640) setIconSize(36);
+  //     else if (width < 768) setIconSize(56);
+  //     else if (width < 1024) setIconSize(72);
+  //     else setIconSize(80);
+  //   };
+
+  //   updateIconSize();
+  //   window.addEventListener('resize', updateIconSize);
+  //   return () => window.removeEventListener('resize', updateIconSize);
+  // }, []);
+
   // Player score functions
   // Improved fetchPlayerScores function with better iOS player deduplication
 const fetchPlayerScores = async (): Promise<void> => {
@@ -339,48 +360,120 @@ const fetchPlayerScores = async (): Promise<void> => {
 
       // Set up settings listener
       const settingsRef = doc(db, "settings", roomId);
-      const unsubscribeSettings = onSnapshot(settingsRef, (snapshot) => {
+      const unsubscribeSettings = onSnapshot(settingsRef, async (snapshot) => {
         if (snapshot.exists()) {
           const settings = snapshot.data() as SettingsData;
           const currentGameMode = settings.gameMode || 'teams';
           setGameMode(currentGameMode);
-          
+
           setGameStarted(settings.gameStarted === true);
-          
+          setCommonCodeWord(settings.commonCodeWord);
+
           if (currentGameMode === 'spy') {
-            const userIsSpy = agentSlug === settings.spyAgent || 
+            const userIsSpy = agentSlug === settings.spyAgent ||
                              (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
+            console.log('🔍 SPY DETECTION:', {
+              agentSlug,
+              spyAgent: settings.spyAgent,
+              spyAgents: settings.spyAgents,
+              userIsSpy,
+              currentGameMode
+            });
+
+            // Block agent listener from overwriting during update
+            setIsUpdatingSpyStatus(true);
             setIsSpy(userIsSpy);
             setIsSpymaster({ isRed: false, isBlue: false });
-            updateAgentForSpyMode(settings);
+
+            // Set spy status immediately, then update Firebase
+            if (userIsSpy) {
+              setCodeWord('spy');
+            }
+            await updateAgentForSpyMode(settings);
+            // Don't clear the flag immediately - let the agent listener clear it when it receives correct data
+            console.log('✅ updateAgentForSpyMode completed, waiting for agent listener to confirm');
+            // But add a fallback timeout in case Firebase doesn't send an update
+            setTimeout(() => {
+              console.log('⏰ Fallback timeout: clearing update flag');
+              setIsUpdatingSpyStatus(false);
+            }, 3000);
           } else {
             setIsSpy(false);
             setIsSpymaster({
               isRed: agentSlug === settings.redSpymaster,
               isBlue: agentSlug === settings.blueSpymaster
             });
-            updateAgentForTeamMode(settings);
+            await updateAgentForTeamMode(settings);
           }
         }
       });
 
       // Set up agent listener
+      // This listener syncs state with Firebase, but settings listener takes priority for spy detection
       const unsubscribeAgent = onSnapshot(agentRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
+          console.log('👤 AGENT DATA UPDATE:', {
+            agentId: data.agentId,
+            codeWord: data.codeWord,
+            isSpy: data.isSpy,
+            timestamp: Date.now()
+          });
+
+          // Always update agentId and agentName
           setAgentId(data.agentId ?? null);
-          setCodeWord(data.codeWord ?? null);
-          
+
           // Update local storage with the latest agent name
           if (data.agentName) {
             setAgentName(data.agentName);
             localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, data.agentName);
           }
-          
-          if (data.isSpy !== undefined) {
-            setIsSpy(Boolean(data.isSpy));
-          }
-          
+
+          // Update spy status and codeword from Firebase
+          // But skip if settings listener is currently updating (prevents race condition)
+
+          // Check consistency: isSpy and codeWord should match
+          const dataIsConsistent = (Boolean(data.isSpy) && data.codeWord === 'spy') ||
+                                   (!Boolean(data.isSpy) && data.codeWord !== 'spy');
+
+          setCodeWord(currentCodeWord => {
+            const newCodeWord = data.codeWord;
+            console.log('📝 codeWord update - current:', currentCodeWord, 'new from Firebase:', newCodeWord, 'isUpdating:', isUpdatingSpyStatus, 'dataConsistent:', dataIsConsistent);
+            // Don't overwrite if we're in the middle of a spy status update from settings
+            if (isUpdatingSpyStatus) {
+              // Check if Firebase now has the CORRECT data
+              if (currentCodeWord === newCodeWord && dataIsConsistent) {
+                console.log('✅ Firebase data matches expected state, clearing update flag');
+                setIsUpdatingSpyStatus(false);
+              } else {
+                console.log('⏸️  Skipping codeWord update - status update in progress');
+                return currentCodeWord;
+              }
+            }
+            // Only accept the update if Firebase data is internally consistent
+            if (!dataIsConsistent) {
+              console.log('⚠️  Skipping codeWord update - Firebase data is inconsistent');
+              return currentCodeWord;
+            }
+            return newCodeWord;
+          });
+
+          setIsSpy(currentIsSpy => {
+            const newIsSpy = Boolean(data.isSpy);
+            console.log('🎯 isSpy update - current:', currentIsSpy, 'new from Firebase:', newIsSpy, 'isUpdating:', isUpdatingSpyStatus, 'dataConsistent:', dataIsConsistent);
+            // Check handled in setCodeWord above
+            if (isUpdatingSpyStatus) {
+              console.log('⏸️  Skipping isSpy update - status update in progress');
+              return currentIsSpy;
+            }
+            // Only accept the update if Firebase data is internally consistent
+            if (!dataIsConsistent) {
+              console.log('⚠️  Skipping isSpy update - Firebase data is inconsistent');
+              return currentIsSpy;
+            }
+            return newIsSpy;
+          });
+
           setLoading(false);
         } else {
           // No agent document exists, create it
@@ -417,29 +510,36 @@ const fetchPlayerScores = async (): Promise<void> => {
   }, [agentName, agentId, roomId, agentSlug]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
-    if (!agentName) return;
-
     const agentKey = `${roomId}_${agentSlug}`;
     const agentRef = doc(db, "agents", agentKey);
-    
+
     const userIsSpy = agentSlug === settings.spyAgent ||
                      (settings.spyAgents !== undefined && settings.spyAgents.includes(agentSlug));
-    
+
+    const dataToWrite: Record<string, unknown> = {
+      agentId: agentSlug,
+      roomId,
+      codeWord: userIsSpy ? 'spy' : settings.commonCodeWord,
+      isSpy: userIsSpy
+    };
+
+    // Include agentName if it's available
+    if (agentName) {
+      dataToWrite.agentName = agentName;
+    }
+
+    console.log('🔄 Writing to Firebase:', dataToWrite);
+
     try {
-      await setDoc(agentRef, {
-        agentId: agentSlug,
-        agentName,
-        roomId,
-        codeWord: userIsSpy ? 'spy' : settings.commonCodeWord,
-        isSpy: userIsSpy
-      }, { merge: true });
-      
+      await setDoc(agentRef, dataToWrite, { merge: true });
+      console.log('✍️ Firebase write completed successfully');
+
       setIsSpy(userIsSpy);
       if (userIsSpy) {
         setCodeWord('spy');
       }
     } catch (error) {
-      console.error('Error updating agent for spy mode:', error);
+      console.error('❌ Error updating agent for spy mode:', error);
     }
   };
 
@@ -561,34 +661,34 @@ const fetchPlayerScores = async (): Promise<void> => {
     setShowScores(true);
   };
 
-  const leaveRoom = () => {
-    router.push('/');
-  };
+  // const leaveRoom = () => {
+  //   router.push('/');
+  // };
 
   const isAnySpymaster = isSpymaster.isRed || isSpymaster.isBlue;
   const isRedSpymaster = isSpymaster.isRed;
   const isBlueSpymaster = isSpymaster.isBlue;
 
-  const getBgClasses = () => {
-    if (isSpy) return "bg-red-50";
-    if (isRedSpymaster) return "bg-red-50";
-    if (isBlueSpymaster) return "bg-blue-50";
-    return "bg-zinc-100";
-  };
+  // const getBgClasses = () => {
+  //   if (isSpy) return "bg-zinc-100";
+  //   if (isRedSpymaster) return "bg-red-50";
+  //   if (isBlueSpymaster) return "bg-blue-50";
+  //   return "bg-zinc-100";
+  // };
 
-  const getTextColorClass = () => {
-    if (isSpy) return "text-red-600";
-    if (isRedSpymaster) return "text-red-600";
-    if (isBlueSpymaster) return "text-blue-600";
-    return "text-zinc-900";
-  };
+  // const getTextColorClass = () => {
+  //   if (isSpy) return "text-zinc-900";
+  //   if (isRedSpymaster) return "text-red-600";
+  //   if (isBlueSpymaster) return "text-blue-600";
+  //   return "text-zinc-900";
+  // };
 
-  const getBorderColorClass = () => {
-    if (isSpy) return "border-red-200";
-    if (isRedSpymaster) return "border-red-200";
-    if (isBlueSpymaster) return "border-blue-200";
-    return "border-zinc-200";
-  };
+  // const getBorderColorClass = () => {
+  //   if (isSpy) return "border-zinc-200";
+  //   if (isRedSpymaster) return "border-red-200";
+  //   if (isBlueSpymaster) return "border-blue-200";
+  //   return "border-zinc-200";
+  // };
 
   const getRoleDisplay = () => {
     if (gameMode === 'spy') {
@@ -611,239 +711,353 @@ const fetchPlayerScores = async (): Promise<void> => {
 
   if (!loading && !error && !gameStarted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white rounded-lg shadow-lg overflow-hidden transform transition-all duration-500 opacity-100">
-          <div className="border-b border-gray-200 p-4 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <div className="font-mono text-lg">Waiting For Game Start</div>
-              <button 
-                onClick={leaveRoom}
-                className="text-sm text-zinc-500 hover:text-zinc-900"
-              >
-                EXIT
-              </button>
-            </div>
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ backgroundColor: '#F9FAFB' }}
+      >
+        <div className="w-full max-w-md">
+          {/* Message */}
+          <p
+            className="text-center mb-6"
+            style={{
+              fontSize: '28px',
+              fontWeight: 600,
+              color: '#000000',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              lineHeight: 1.5,
+            }}
+          >
+            Waiting for Host to start.
+          </p>
+
+          {/* Room Code */}
+          <p
+            className="text-center mb-8"
+            style={{
+              fontSize: '20px',
+              fontWeight: 600,
+              color: '#000000',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            ROOM: {roomId}
+          </p>
+
+          {/* QR Code */}
+          <div
+            className="mb-6 p-4 mx-auto"
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '20px',
+              maxWidth: '280px',
+            }}
+          >
+            <QRCodeSVG
+              value={`https://redblue-ten.vercel.app/${roomId}`}
+              size={240}
+              level="M"
+              className="mx-auto"
+            />
           </div>
-          
-          <div className="p-8 flex flex-col items-center">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold mb-2">Room ID: {roomId}</h2>
-              <p className="text-gray-600 mb-4">Waiting for the game host to start the game...</p>
-            </div>
-            
-            <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-              <QRCodeSVG 
-                value={`https://redblue-ten.vercel.app/${roomId}`}
-                size={240}
-                level="M"
-                className="mx-auto"
-              />
-            </div>
-            
-            <div className="text-center text-sm text-gray-500">
-              <p>Share this QR code with others to join this room</p>
-              <p className="font-mono mt-2">Web users: redblue-ten.vercel.app</p>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-200 p-4 bg-gray-50">
-            <div className="flex justify-between items-center text-xs font-mono text-gray-500">
-              <span>ROOM::{roomId}</span>
-              <span>AGENT::{agentName || agentId || '--'}</span>
-            </div>
+
+          {/* Info Text */}
+          <p
+            className="text-center mb-8"
+            style={{
+              fontSize: '16px',
+              fontWeight: 400,
+              color: '#666666',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            Share this QR code with others to join
+          </p>
+
+          {/* Agent Info */}
+          <div
+            className="p-4"
+            style={{
+              backgroundColor: '#FDD804',
+              borderRadius: '20px',
+            }}
+          >
+            <p
+              className="text-center"
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {agentName || agentId || 'Agent'}
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
+  console.log('🎯 COMPONENT RENDER STATE:', {
+    isSpy,
+    codeWord,
+    agentId,
+    gameStarted,
+    gameMode,
+    isUpdatingSpyStatus,
+    loading,
+    error
+  });
+
   return (
-    <div className={`min-h-screen ${getBgClasses()} flex items-center justify-center p-6 relative overflow-hidden`}>
+    <div
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{ backgroundColor: '#F9FAFB' }}
+    >
       {/* Show the removed alert if the player has been removed */}
       {hasBeenRemoved && (
         <RemovedAlert onClose={() => {
           router.push('/');
         }} />
       )}
-      
-      {(isAnySpymaster || isSpy) && (
-        <div className="absolute inset-0">
-          <div
-            className={`absolute inset-0 ${
-              isSpy ? 'bg-red-100/30'
-            : isRedSpymaster ? 'bg-red-100/30'
-            : 'bg-blue-100/30'
-            }`}
-          >
-            <div
-              className="absolute inset-0 opacity-10"
-              style={{
-                backgroundImage: `repeating-linear-gradient(
-                  45deg,
-                  ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 0px,
-                  ${isSpy || isRedSpymaster ? '#ef4444' : '#3b82f6'} 1px,
-                  transparent 1px,
-                  transparent 60px
-                )`
-              }}
-            />
-          </div>
-        </div>
-      )}
 
-      <div className={`w-full max-w-2xl transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-        <div className="bg-white border border-gray-200 relative shadow-lg rounded-lg overflow-hidden">
-          <div className={`border-b ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
+      <div className={`w-full max-w-md transform transition-all duration-300 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        {error && (
+          <div
+            className="mb-6 p-4"
+            style={{
+              backgroundColor: '#FEE2E2',
+              borderRadius: '16px',
+            }}
+          >
+            <p
+              className="text-center"
+              style={{
+                fontWeight: 500,
+                fontSize: '18px',
+                color: '#DC2626',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {error}
+            </p>
+          </div>
+        )}
+
+        {agentId && codeWord ? (
+          <>
+            {/* Room Info & Actions */}
+            <div className="mb-6 flex justify-between items-center">
+              <p
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#666666',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                ROOM: {roomId}
+              </p>
+              <button
+                onClick={handleShowScores}
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#FDD804',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                SCORES
+              </button>
+            </div>
+
+            {/* Role Badge */}
+            {(isAnySpymaster || isSpy) && (
+              <div
+                className="mb-6 p-4 flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: isSpy ? '#E5E7EB' : isRedSpymaster ? '#FEE2E2' : '#DBEAFE',
+                  borderRadius: '16px',
+                }}
+              >
                 {isSpy ? (
-                  <Eye className={`w-5 h-5 ${getTextColorClass()}`} />
+                  <Eye style={{ width: '24px', height: '24px', color: '#000000' }} />
                 ) : (
-                  <Shield className={`w-5 h-5 ${getTextColorClass()}`} />
+                  <Crown
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      color: isRedSpymaster ? '#DC2626' : '#2563EB',
+                    }}
+                  />
                 )}
-                <span className={`font-mono text-sm ${getTextColorClass()}`}>
+                <span
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    color: isSpy ? '#000000' : isRedSpymaster ? '#DC2626' : '#2563EB',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  }}
+                >
                   {getRoleDisplay()}
                 </span>
               </div>
-              <div className={`font-mono text-sm ${getTextColorClass()}`}>
-                {agentName || agentId || '--'}
+            )}
+
+            {/* Agent Name */}
+            <div className="mb-6">
+              <p
+                className="mb-2"
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#666666',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                Your Name
+              </p>
+              <div
+                className="p-6"
+                style={{
+                  backgroundColor: '#FDD804',
+                  borderRadius: '20px',
+                }}
+              >
+                <p
+                  className="text-center"
+                  style={{
+                    fontSize: '32px',
+                    fontWeight: 700,
+                    color: '#000000',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  }}
+                >
+                  {agentName || agentId}
+                </p>
               </div>
             </div>
-          </div>
 
-          <div className="p-8 relative">
-            {error && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            {/* Code Sign / Spy Status */}
+            <div>
+              <p
+                className="mb-4 text-center"
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#666666',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                {isSpy ? 'Your Status' : 'Your Code Sign'}
+              </p>
 
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
-                <div className="text-zinc-600 font-mono">ACCESSING SYSTEM...</div>
-              </div>
-            ) : agentId && codeWord ? (
-              <div className="space-y-8">
-                <div className="flex justify-between items-center">
-                  <div className="font-mono text-sm text-zinc-500">ROOM: {roomId}</div>
-                  <div className="flex space-x-4">
-                    <button 
-                      onClick={handleShowScores}
-                      className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      <ClipboardList className="w-4 h-4" />
-                      <span>VIEW SCORES</span>
-                    </button>
-                    <button 
-                      onClick={leaveRoom}
-                      className="text-sm text-zinc-500 hover:text-zinc-900"
-                    >
-                      LEAVE ROOM
-                    </button>
-                  </div>
-                </div>
-                
-                {(isAnySpymaster || isSpy) && (
-                  <div
-                    className={`p-3 ${getBgClasses()} ${getTextColorClass()} ${getBorderColorClass()} border rounded-md flex items-center gap-2`}
+              {(() => {
+                console.log('🎨 RENDERING:', { isSpy, codeWord, shouldShowSpy: isSpy || codeWord === 'spy' });
+                return null;
+              })()}
+
+              {isSpy || codeWord === 'spy' ? (
+                <div
+                  className="p-8"
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '20px',
+                  }}
+                >
+                  <p
+                    className="text-center"
+                    style={{
+                      fontSize: '64px',
+                      fontWeight: 900,
+                      color: '#000000',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    }}
                   >
-                    {isSpy ? <Eye className="w-5 h-5" /> : <Crown className="w-5 h-5" />}
-                    <span className="font-mono text-sm">{getRoleDisplay()}</span>
-                  </div>
-                )}
-                
-                <div>
-                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>AGENT_NAME</div>
-                  <div
-                    className={`text-6xl font-mono ${getTextColorClass()} border ${getBorderColorClass()} p-6 relative group ${getBgClasses()} rounded-lg`}
-                  >
-                    <div
-                      className={`absolute inset-0 ${
-                        isSpy ? 'bg-red-100'
-                      : isRedSpymaster ? 'bg-red-100'
-                      : isBlueSpymaster ? 'bg-blue-100'
-                      : 'bg-gray-100'
-                      } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
-                    />
-                    <span className="relative">{agentName || agentId}</span>
-                  </div>
+                    SPY
+                  </p>
                 </div>
-
-                <div>
-                  <div className={`font-mono text-lg mb-2 ${getTextColorClass()}`}>
-                    {isSpy ? 'SPY STATUS' : 'CODE SIGN'}
-                  </div>
-                  <div className="flex justify-center">
-                    <div
-                      className={`${getBgClasses()} border ${getBorderColorClass()} p-8 relative group rounded-lg aspect-square w-96 h-96 flex items-center justify-center`}
-                    >
-                      <div
-                        className={`absolute inset-0 ${
-                          isSpy ? 'bg-red-100'
-                        : isRedSpymaster ? 'bg-red-100'
-                        : isBlueSpymaster ? 'bg-blue-100'
-                        : 'bg-gray-100'
-                        } opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
-                      />
-                      {isSpy || codeWord === 'spy' ? (
-                        <div className="text-6xl font-mono text-red-600">SPY</div>
-                      ) : (
-                        <IconForWord
-                          word={codeWord}
-                          size={300}
-                          className={getTextColorClass()}
-                        />
-                      )}
-                    </div>
-                  </div>
+              ) : (
+                <div
+                  className="p-8 flex items-center justify-center"
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '20px',
+                    minHeight: '280px',
+                  }}
+                >
+                  <IconForWord word={codeWord} size={240} />
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-                <div className="text-zinc-600 font-mono text-center">
-                  SYSTEM ACCESS ERROR
-                  <br />
-                  <span className="text-sm mt-2 block">Please refresh or return to the home page</span>
-                </div>
-              </div>
-            )}
-
-            {(isSpy || codeWord === 'spy') && (
-              <div className="mt-8 sm:mt-12 space-y-4">
-                <div className={`font-mono text-base sm:text-lg ${getTextColorClass()}`}>ALL POSSIBLE CODE SIGNS</div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3 md:gap-4">
-                  {allCodeWords.map((word) => (
-                    <div
-                      key={word}
-                      className={`${getBgClasses()} border ${getBorderColorClass()} p-2 sm:p-3 md:p-4 rounded-lg aspect-square flex items-center justify-center relative group min-h-[80px] sm:min-h-[100px] md:min-h-[120px]`}
-                    >
-                      <div
-                        className={`absolute inset-0 bg-red-100 opacity-0 group-hover:opacity-10 transition-opacity rounded-lg`}
-                      />
-                      <div className="w-full h-full flex items-center justify-center">
-                        <IconForWord
-                          word={word}
-                          size={iconSize}
-                          className={getTextColorClass()}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <AlertCircle
+              className="mx-auto mb-4"
+              style={{ width: '48px', height: '48px', color: '#DC2626' }}
+            />
+            <p
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              Error loading
+            </p>
+            <p
+              className="mt-2"
+              style={{
+                fontSize: '16px',
+                fontWeight: 400,
+                color: '#666666',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              Please refresh the page
+            </p>
           </div>
+        )}
 
-          <div className={`border-t ${getBorderColorClass()} p-4 ${getBgClasses()}`}>
-            <div className="flex justify-between items-center text-xs font-mono text-gray-500">
-              <span>ROOM::{roomId}</span>
-              <span>{getRoleDisplay()}{agentName ? `::${agentName}` : ''}</span>
+        {/* Spy Code Words Grid */}
+        {(isSpy || codeWord === 'spy') && agentId && (
+          <div className="mt-8">
+            <p
+              className="mb-4 text-center"
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#666666',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              Possible Code Signs
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {spyCodeWords.map((word) => (
+                <div
+                  key={word}
+                  className="p-2 flex items-center justify-center"
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '16px',
+                    aspectRatio: '1/1',
+                  }}
+                >
+                  <IconForWord word={word} size={200} />
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Player Scores Modal */}

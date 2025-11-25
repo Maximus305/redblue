@@ -1,84 +1,19 @@
 "use client"
-import React, { useState, useEffect, use } from 'react';
+import React, { use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { db, auth } from '@/lib/firebase';
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  onSnapshot,
-  serverTimestamp,
-  Timestamp,
-  collection
-} from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
-import { validateRoomId, formatRoomId, tryJoinRoom } from '@/utils/roomUtils';
+import { formatRoomId } from '@/utils/roomUtils';
+import { useCloneGame } from '@/hooks/useCloneGame';
 
-// ============================================================================
-// TYPES - RedBlue Spec v3.2
-// ============================================================================
-
-type GamePhase = 'LOBBY' | 'CALIBRATE' | 'ROUND_INTRO' | 'SPEAKER_DECIDE' | 'VOTING' | 'REVEAL' | 'LEADERBOARD' | 'END';
-type ErrorCode = 'ROOM_NOT_FOUND' | 'ROOM_CLOSED' | 'ROOM_FULL' | 'PERMISSION_DENIED' | 'PHASE_INVALID' | 'DEADLINE_PASSED' | 'ALREADY_SET';
-
-interface CalibrationQuestion {
-  id: string;
-  text: string;
-  choices: string[];
-  choiceTraits: string[][];
-  tags: string[];
-  difficulty: string;
-}
-
-interface Room {
-  roomId: string;
-  status: {
-    phase: GamePhase;
-    roundIndex: number;
-    voteDeadline?: Timestamp | null;
-    currentRoundId?: string | null;
-  };
-  settings: {
-    maxPlayers?: number;
-  };
-  active?: boolean;
-  topicPack?: string;
-}
-
-interface Player {
-  id: string;
-  name: string;
-  avatar?: string;
-  color?: string;
-  traits: string[];
-  score: number;
-  joinedAt: Timestamp;
-}
-
-interface Round {
-  id: string;
-  speakerId: string;
-  questionText: string;
-  speakerChoice: 'AI' | 'Self' | null;
-  aiAnswerPrivate?: string | null;
-  aiAnswerPrivateFor?: string | null;
-  aiAnswer?: string | null;
-  selfAnswer?: string | null;
-  voteDeadline?: Timestamp | null;
-  tally?: { AI: number; Self: number } | null;
-  result?: {
-    majority: 'AI' | 'Self' | 'Tie';
-    fooledMajority: boolean;
-  } | null;
-}
-
-// Color options
-const COLOR_OPTIONS = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF', '#FF8B94', '#C7CEEA'];
-
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+// Screen Components
+import { VerifyingScreen } from '@/components/clone-game/VerifyingScreen';
+import { ErrorScreen } from '@/components/clone-game/ErrorScreen';
+import { JoinScreen } from '@/components/clone-game/JoinScreen';
+import { CalibrationScreen } from '@/components/clone-game/CalibrationScreen';
+import { WaitScreen } from '@/components/clone-game/WaitScreen';
+import { SpeakerDecideScreen } from '@/components/clone-game/SpeakerDecideScreen';
+import { VotingScreen } from '@/components/clone-game/VotingScreen';
+import { ResultScreen } from '@/components/clone-game/ResultScreen';
+import { LeaderboardScreen } from '@/components/clone-game/LeaderboardScreen';
 
 interface CloneRoomJoinPageProps {
   params: Promise<{ roomId: string }>;
@@ -87,921 +22,137 @@ interface CloneRoomJoinPageProps {
 export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
   const router = useRouter();
   const resolvedParams = use(params);
-  const roomIdParam = resolvedParams.roomId;
+  const urlRoomId = resolvedParams.roomId;
 
-  // Normalize room code to lowercase with dash
-  const roomCode = formatRoomId(roomIdParam);
-
-  // State - exactly 3 subscriptions
-  const [room, setRoom] = useState<Room | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentRound, setCurrentRound] = useState<Round | null>(null);
-
-  // Local player state
-  const [myId, setMyId] = useState<string>('');
-  const [me, setMe] = useState<Player | null>(null);
-
-  // UI state
-  const [error, setError] = useState<ErrorCode | string>('');
-  const [loading, setLoading] = useState(false);
-  const [verifying, setVerifying] = useState(true);
-
-  // Join screen (RB-A) state
-  const [name, setName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(COLOR_OPTIONS[0]);
-
-  // Profile screen (RB-B) state - NEW: Multiple choice calibration
-  const [calibrationQuestions, setCalibrationQuestions] = useState<CalibrationQuestion[]>([]);
-  const [calibrationAnswers, setCalibrationAnswers] = useState<Record<number, number>>({});  // questionIndex -> choiceIndex
-
-  // Speaker screen (RB-D) state
-  const [speakerChoice, setSpeakerChoice] = useState<'AI' | 'Self' | null>(null);
-  const [selfAnswer, setSelfAnswer] = useState('');
-
-  // Vote screen (RB-E) state
-  const [hasVoted, setHasVoted] = useState(false);
-  const [myVote, setMyVote] = useState<'AI' | 'Self' | null>(null);
-
-  // Derived flags
-  const isSpeaker = currentRound && me ? currentRound.speakerId === me.id : false;
-  const isVotingOpen =
-    room?.status.phase === 'VOTING' &&
-    currentRound?.voteDeadline &&
-    Timestamp.now().toMillis() <= currentRound.voteDeadline.toMillis();
-
-  // ============================================================================
-  // INITIALIZATION
-  // ============================================================================
-
-  // Check if already joined
+  // Redirect to lowercase URL if uppercase is detected
   useEffect(() => {
-    const storedId = localStorage.getItem(`playerId_${roomCode}`);
-    if (storedId) {
-      setMyId(storedId);
+    const lowerRoomId = urlRoomId.toLowerCase();
+    if (urlRoomId !== lowerRoomId) {
+      router.replace(`/clone/${lowerRoomId}`);
     }
-  }, [roomCode]);
-
-  // Verify room exists (Repo B spec v3.4 - sign in BEFORE any read)
-  useEffect(() => {
-    if (!validateRoomId(roomCode)) {
-      setError('ROOM_NOT_FOUND');
-      setVerifying(false);
-      return;
-    }
-
-    const verifyRoom = async () => {
-      try {
-        // Sign in anonymously BEFORE reading (Repo B requirement)
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-          console.log('🔐 Signed in anonymously');
-        }
-
-        // Use tryJoinRoom helper (Repo B spec - Appendix A)
-        const { room: roomData } = await tryJoinRoom(roomCode);
-
-        // Repo B v3.4: Tolerant to missing active field
-        // Falls back to checking phase !== 'END'
-        const isActive = roomData.active ?? (roomData.status?.phase && roomData.status.phase !== 'END');
-
-        if (roomData.active === false) {
-          // Explicitly closed
-          setError('ROOM_CLOSED');
-          setVerifying(false);
-          return;
-        }
-
-        if (!isActive) {
-          // Game ended or inactive
-          setError('ROOM_CLOSED');
-          setVerifying(false);
-          return;
-        }
-
-        setRoom(roomData as Room);
-        setVerifying(false);
-      } catch (err: any) {
-        console.error('Error verifying room:', err);
-        setError(err.message || 'ROOM_NOT_FOUND');
-        setVerifying(false);
-      }
-    };
-
-    verifyRoom();
-  }, [roomCode]);
-
-  // ============================================================================
-  // SUBSCRIPTIONS (exactly 3)
-  // ============================================================================
-
-  // 1. Room subscription (NO room in dependencies to avoid infinite loop!)
-  useEffect(() => {
-    if (!roomCode || verifying) return;
-
-    const roomRef = doc(db, 'rooms', roomCode);
-    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setRoom(snapshot.data() as Room);
-      }
-    });
-
-    return unsubscribe;
-  }, [roomCode, verifying]);
-
-  // 2. Players subscription (NO room in dependencies!)
-  useEffect(() => {
-    if (!roomCode || verifying) return;
-
-    const playersRef = collection(db, 'rooms', roomCode, 'players');
-    const unsubscribe = onSnapshot(playersRef, (snapshot) => {
-      const playersList: Player[] = [];
-      snapshot.forEach((doc) => {
-        playersList.push(doc.data() as Player);
-      });
-      setPlayers(playersList);
-
-      // Update me
-      if (myId) {
-        const myData = playersList.find(p => p.id === myId);
-        setMe(myData || null);
-      }
-    });
-
-    return unsubscribe;
-  }, [roomCode, verifying, myId]);
-
-  // 3. Current round subscription (only when currentRoundId is set)
-  useEffect(() => {
-    if (!roomCode || !room?.status.currentRoundId) {
-      setCurrentRound(null);
-      return;
-    }
-
-    const roundRef = doc(db, 'rooms', roomCode, 'rounds', room.status.currentRoundId);
-    const unsubscribe = onSnapshot(roundRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setCurrentRound(snapshot.data() as Round);
-      } else {
-        setCurrentRound(null);
-      }
-    });
-
-    return unsubscribe;
-  }, [roomCode, room?.status.currentRoundId]);
-
-  // Reset vote state when round changes
-  useEffect(() => {
-    setHasVoted(false);
-    setMyVote(null);
-  }, [currentRound?.id]);
-
-  // Load calibration questions on mount
-  useEffect(() => {
-    const loadCalibrationQuestions = async () => {
-      try {
-        const response = await import('@/data/questions/calibrationQuestions.json');
-        const questions = response.default || response;
-        // Take first 3 questions for calibration
-        setCalibrationQuestions(questions.slice(0, 3));
-      } catch (error) {
-        console.error('Error loading calibration questions:', error);
-        setCalibrationQuestions([]);
-      }
-    };
-
-    loadCalibrationQuestions();
-  }, []);
-
-  // ============================================================================
-  // ACTIONS
-  // ============================================================================
-
-  const handleJoin = async () => {
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Ensure authenticated (Repo B requirement)
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-        console.log('🔐 Signed in anonymously for join');
-      }
-
-      // Check if room is full
-      if (room?.settings.maxPlayers && players.length >= room.settings.maxPlayers) {
-        setError('ROOM_FULL');
-        setLoading(false);
-        return;
-      }
-
-      // Use auth UID as player ID (Repo B spec)
-      const playerId = auth.currentUser!.uid;
-
-      await setDoc(doc(db, 'rooms', roomCode, 'players', playerId), {
-        id: playerId,
-        name: name.trim(),
-        avatar: '',
-        color: selectedColor,
-        traits: [],
-        score: 0,
-        joinedAt: serverTimestamp()
-      });
-
-      localStorage.setItem(`playerId_${roomCode}`, playerId);
-      localStorage.setItem(`playerName_${roomCode}`, name.trim());
-      setMyId(playerId);
-
-      console.log(`✅ Joined room ${roomCode} as ${playerId}`);
-    } catch (err) {
-      console.error('Error joining room:', err);
-      setError('PERMISSION_DENIED');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmitTraits = async () => {
-    if (!me) return;
-
-    // Check that all 3 questions are answered
-    if (Object.keys(calibrationAnswers).length < 3) {
-      setError('Please answer all 3 questions');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Map answers to traits using choiceTraits
-      const traitsSet = new Set<string>();
-
-      calibrationQuestions.forEach((question, questionIndex) => {
-        const choiceIndex = calibrationAnswers[questionIndex];
-        if (choiceIndex !== undefined && question.choiceTraits && question.choiceTraits[choiceIndex]) {
-          const traits = question.choiceTraits[choiceIndex];
-          traits.forEach((trait: string) => traitsSet.add(trait));
-        }
-      });
-
-      const mappedTraits = Array.from(traitsSet);
-
-      // Submit traits using RedBlueGameService
-      await updateDoc(doc(db, 'rooms', roomCode, 'players', me.id), {
-        traits: mappedTraits,
-        hasCompletedCalibration: true,
-        persona: {
-          style: `Based on traits: ${mappedTraits.join(', ')}`,
-          avoid: 'Generic responses, inconsistency with selected traits'
-        }
-      });
-
-      console.log(`✅ Submitted traits from calibration:`, mappedTraits);
-    } catch (err) {
-      console.error('Error submitting traits:', err);
-      setError('PERMISSION_DENIED');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSpeakerChoice = async (choice: 'AI' | 'Self') => {
-    if (!me || !currentRound) return;
-
-    setSpeakerChoice(choice);
-    setLoading(true);
-    setError('');
-
-    try {
-      // Call setSpeakerChoice function (temporary direct write)
-      await updateDoc(doc(db, 'rooms', roomCode, 'rounds', currentRound.id), {
-        speakerChoice: choice,
-        ...(choice === 'Self' && selfAnswer ? { selfAnswer } : {})
-      });
-
-      console.log(`✅ Speaker chose: ${choice}`);
-    } catch (err) {
-      console.error('Error submitting speaker choice:', err);
-      setError('ALREADY_SET');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVote = async (guess: 'AI' | 'Self') => {
-    if (!me || !currentRound) return;
-
-    setMyVote(guess);
-    setHasVoted(true);
-    setLoading(true);
-
-    try {
-      await setDoc(doc(db, 'rooms', roomCode, 'rounds', currentRound.id, 'votes', me.id), {
-        playerId: me.id,
-        guess,
-        createdAt: serverTimestamp()
-      });
-
-      console.log(`✅ Voted: ${guess}`);
-    } catch (err) {
-      console.error('Error submitting vote:', err);
-      setError('DEADLINE_PASSED');
-      setHasVoted(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ============================================================================
-  // SCREEN ROUTING
-  // ============================================================================
-
-  const determineScreen = (): string => {
-    // Still verifying or loading
-    if (verifying) return 'VERIFYING';
-
-    // Error state
-    if (error) return 'ERROR';
-
-    // Not joined yet
-    if (!me) return 'RB-A'; // Join
-
-    // Wait for room data to fully load
-    if (!room || !room.status) return 'VERIFYING';
-
-    const phase = room.status.phase;
-
-    // Repo B v3.4: Show Profile ONLY if uncalibrated (traits < 3)
-    if (phase === 'CALIBRATE' && me.traits.length < 3) {
-      return 'RB-B'; // Profile
-    }
-
-    // Repo B v3.4: Calibrated players wait during CALIBRATE phase
-    if (phase === 'CALIBRATE' && me.traits.length >= 3) {
-      return 'RB-C'; // Wait
-    }
-
-    // Speaker Decide
-    if (phase === 'SPEAKER_DECIDE' && isSpeaker) {
-      return 'RB-D';
-    }
-
-    // Voting
-    if (phase === 'VOTING' && !isSpeaker) {
-      return 'RB-E';
-    }
-
-    // Reveal
-    if (phase === 'REVEAL') {
-      return 'RB-F';
-    }
-
-    // Default to Wait/Status for all other cases
-    return 'RB-C';
-  };
-
-  const currentScreen = determineScreen();
-
-  // ============================================================================
-  // RENDER HELPERS
-  // ============================================================================
-
-  const getErrorMessage = (code: ErrorCode | string): string => {
-    const messages: Record<ErrorCode, string> = {
-      ROOM_NOT_FOUND: 'Room not found. Please check the room code.',
-      ROOM_CLOSED: 'This room has ended or is no longer active.',
-      ROOM_FULL: 'This room is full.',
-      PERMISSION_DENIED: 'Permission denied.',
-      PHASE_INVALID: 'Invalid game phase.',
-      DEADLINE_PASSED: 'Voting closed.',
-      ALREADY_SET: 'Choice already made.'
-    };
-
-    return messages[code as ErrorCode] || code;
-  };
-
-  // ============================================================================
-  // SCREEN RENDERERS
-  // ============================================================================
-
-  if (currentScreen === 'VERIFYING') {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <div className="font-mono text-xl font-bold" style={{color: 'black'}}>VERIFYING ROOM...</div>
-          <div className="text-sm mt-2" style={{color: 'black', opacity: 0.8}}>Room: {roomCode}</div>
-        </div>
-      </div>
-    );
+  }, [urlRoomId, router]);
+
+  // Format for actual room lookup (converts to uppercase)
+  const roomCode = formatRoomId(urlRoomId);
+
+  const game = useCloneGame(roomCode);
+
+  // Render appropriate screen
+  switch (game.currentScreen) {
+    case 'VERIFYING':
+      return <VerifyingScreen />;
+
+    case 'ERROR':
+      return <ErrorScreen error={game.error} roomCode={roomCode} />;
+
+    case 'RB-A':
+      return (
+        <JoinScreen
+          roomCode={roomCode}
+          name={game.name}
+          setName={game.setName}
+          selectedColor={game.selectedColor}
+          setSelectedColor={game.setSelectedColor}
+          onJoin={game.handleJoin}
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-B':
+      return (
+        <CalibrationScreen
+          questions={game.calibrationQuestions}
+          answers={game.calibrationAnswers}
+          setAnswers={game.setCalibrationAnswers}
+          onSubmit={game.handleSubmitTraits}
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-C':
+      return (
+        <WaitScreen
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          isSpeaker={game.isSpeaker}
+          prepTimeRemaining={game.prepTimeRemaining}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-D':
+      return (
+        <SpeakerDecideScreen
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          speakerChoice={game.speakerChoice}
+          onChoice={game.handleSpeakerChoice}
+          prepTimeRemaining={game.prepTimeRemaining}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-E':
+      return (
+        <VotingScreen
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          hasVoted={game.hasVoted}
+          myVote={game.myVote}
+          timeRemaining={game.timeRemaining}
+          isVotingOpen={game.isVotingOpen}
+          onVote={game.handleVote}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-F':
+      return (
+        <ResultScreen
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          myVote={game.myVote}
+          isSpeaker={game.isSpeaker}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    case 'RB-G':
+      return (
+        <LeaderboardScreen
+          room={game.room}
+          me={game.me}
+          players={game.players}
+          currentRound={game.currentRound}
+          isSpeaker={game.isSpeaker}
+          loading={game.loading}
+          error={game.error}
+        />
+      );
+
+    default:
+      return <VerifyingScreen />;
   }
-
-  if (currentScreen === 'ERROR') {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div style={{
-          maxWidth: '400px',
-          width: '100%',
-          padding: '40px',
-          margin: '20px'
-        }}>
-          <div className="flex flex-col items-center justify-center">
-            <div className="text-red-400 text-6xl mb-4">⚠️</div>
-            <div className="font-bold text-xl mb-2" style={{color: 'black'}}>CONNECTION ERROR</div>
-            <div className="text-center mb-6" style={{color: 'black'}}>{getErrorMessage(error)}</div>
-            <div className="text-sm mb-4" style={{color: 'black'}}>Room: {roomCode}</div>
-            <button
-              onClick={() => router.push('/')}
-              style={{
-                backgroundColor: '#0045FF',
-                color: 'white',
-                padding: '16px 32px',
-                borderRadius: '50px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold'
-              }}
-            >
-              Return Home
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // RB-A: Join
-  if (currentScreen === 'RB-A') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="w-full max-w-md">
-          {/* Header */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingTop: '40px',
-            paddingBottom: '20px'
-          }}>
-            <img
-              src="/PigImage.png"
-              alt="RedBlue"
-              style={{
-                width: '300px',
-                height: 'auto',
-                marginBottom: '20px'
-              }}
-            />
-            <h1 style={{
-              fontSize: '48px',
-              fontWeight: '700',
-              color: '#0045FF',
-              textAlign: 'center',
-              margin: 0,
-              letterSpacing: '2px',
-              fontFamily: 'var(--font-ojuju), sans-serif'
-            }}>LET&apos;S PLAY REDBLUE</h1>
-          </div>
-
-          <div style={{padding: '20px 40px 40px 40px'}}>
-            <div style={{textAlign: 'center', marginBottom: '30px'}}>
-              <p style={{
-                fontSize: '20px',
-                fontWeight: '500',
-                color: 'black',
-                margin: 0
-              }}>Put your name or a fun nickname</p>
-            </div>
-
-            <div style={{marginBottom: '20px'}}>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && !loading && handleJoin()}
-                placeholder="Your name..."
-                style={{
-                  width: '100%',
-                  padding: '20px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  borderRadius: '12px',
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '24px',
-                  color: 'black',
-                  textAlign: 'center',
-                  boxSizing: 'border-box'
-                }}
-                autoFocus
-                disabled={loading}
-                maxLength={20}
-              />
-            </div>
-
-            {/* Color picker */}
-            <div style={{marginBottom: '30px'}}>
-              <p style={{textAlign: 'center', marginBottom: '15px', color: 'black', fontSize: '16px'}}>Pick a color</p>
-              <div style={{display: 'flex', gap: '12px', justifyContent: 'center'}}>
-                {COLOR_OPTIONS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    style={{
-                      width: '50px',
-                      height: '50px',
-                      borderRadius: '50%',
-                      border: selectedColor === color ? '4px solid #0045FF' : '2px solid transparent',
-                      backgroundColor: color,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {error && (
-              <div style={{
-                marginBottom: '30px',
-                padding: '15px',
-                backgroundColor: '#fee',
-                borderRadius: '8px'
-              }}>
-                <p style={{fontSize: '16px', color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
-              </div>
-            )}
-
-            {name.trim() && (
-              <button
-                onClick={handleJoin}
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  backgroundColor: loading ? 'rgba(0, 69, 255, 0.5)' : '#0045FF',
-                  color: 'white',
-                  padding: '20px',
-                  borderRadius: '50px',
-                  border: 'none',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  fontSize: '20px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '10px',
-                  letterSpacing: '0.5px'
-                }}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>JOINING...</span>
-                  </>
-                ) : (
-                  <span>JOIN REDBLUE GAME</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // RB-B: Profile (Calibration) - NEW: Multiple Choice Questions
-  if (currentScreen === 'RB-B') {
-    const allAnswered = Object.keys(calibrationAnswers).length === 3;
-
-    return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold mb-2" style={{color: '#0045FF'}}>Calibration</h1>
-          <p className="text-gray-700 mb-6 text-lg">Answer these questions to help us understand you</p>
-
-          <div className="flex-1 overflow-auto mb-6 space-y-6">
-            {calibrationQuestions.map((question, questionIndex) => (
-              <div key={question.id} style={{backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'}}>
-                <p className="text-lg font-semibold mb-4" style={{color: '#000'}}>
-                  {questionIndex + 1}. {question.text}
-                </p>
-
-                <div className="space-y-3">
-                  {question.choices.map((choice: string, choiceIndex: number) => {
-                    const isSelected = calibrationAnswers[questionIndex] === choiceIndex;
-
-                    return (
-                      <button
-                        key={choiceIndex}
-                        onClick={() => {
-                          setCalibrationAnswers({
-                            ...calibrationAnswers,
-                            [questionIndex]: choiceIndex
-                          });
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          borderRadius: '12px',
-                          fontWeight: '600',
-                          fontSize: '16px',
-                          textAlign: 'left',
-                          transition: 'all 0.2s',
-                          backgroundColor: isSelected ? '#0045FF' : 'white',
-                          color: isSelected ? 'white' : '#000',
-                          border: isSelected ? '2px solid #0045FF' : '2px solid #ddd',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {choice}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center text-sm mb-4" style={{color: '#666'}}>
-            Answered: {Object.keys(calibrationAnswers).length} / 3
-          </div>
-
-          {error && (
-            <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
-            </div>
-          )}
-
-          <button
-            onClick={handleSubmitTraits}
-            disabled={loading || !allAnswered}
-            style={{
-              width: '100%',
-              padding: '18px',
-              backgroundColor: (loading || !allAnswered) ? '#ccc' : '#0045FF',
-              color: 'white',
-              borderRadius: '50px',
-              border: 'none',
-              cursor: (loading || !allAnswered) ? 'not-allowed' : 'pointer',
-              fontSize: '18px',
-              fontWeight: 'bold'
-            }}
-          >
-            {loading ? 'SUBMITTING...' : 'SUBMIT'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // RB-C: Wait/Status
-  if (currentScreen === 'RB-C') {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="text-center p-6">
-          <h1 className="text-5xl font-bold mb-6" style={{color: '#0045FF'}}>RedBlue</h1>
-
-          {/* Topic Badge (Repo B v3.4) */}
-          {room?.topicPack && (
-            <div className="mb-6">
-              <div style={{
-                display: 'inline-block',
-                padding: '8px 20px',
-                backgroundColor: '#E0E7FF',
-                borderRadius: '20px',
-                border: '2px solid #6366F1'
-              }}>
-                <p className="text-sm font-semibold" style={{color: '#4338CA'}}>
-                  Topic: {room.topicPack}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-8">
-            <p className="text-lg mb-2" style={{color: '#666'}}>Phase</p>
-            <p className="text-4xl font-bold" style={{color: 'black'}}>{room?.status.phase || 'LOBBY'}</p>
-          </div>
-          {currentRound && (
-            <div>
-              <p className="text-xl" style={{color: '#666'}}>
-                {isSpeaker ? "You're up!" : 'Watch and wait...'}
-              </p>
-            </div>
-          )}
-          <div className="mt-8">
-            <p className="text-sm" style={{color: '#999'}}>{players.length} player{players.length !== 1 ? 's' : ''} in room</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // RB-D: Speaker Decide
-  if (currentScreen === 'RB-D') {
-    return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold mb-4" style={{color: '#0045FF'}}>Your Turn</h1>
-
-          {/* Topic Badge (Repo B v3.4) */}
-          {room?.topicPack && (
-            <div className="mb-4">
-              <div style={{
-                display: 'inline-block',
-                padding: '6px 16px',
-                backgroundColor: '#E0E7FF',
-                borderRadius: '16px',
-                border: '2px solid #6366F1'
-              }}>
-                <p className="text-xs font-semibold" style={{color: '#4338CA'}}>
-                  Topic: {room.topicPack}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <p className="text-2xl mb-8" style={{color: 'black'}}>{currentRound?.questionText}</p>
-
-          <div className="flex-1 mb-6">
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <button
-                onClick={() => !currentRound?.speakerChoice && handleSpeakerChoice('AI')}
-                disabled={currentRound?.speakerChoice !== null}
-                style={{
-                  padding: '60px 20px',
-                  borderRadius: '16px',
-                  fontWeight: 'bold',
-                  fontSize: '32px',
-                  backgroundColor: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? '#9333EA' : 'white',
-                  color: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? 'white' : 'black',
-                  border: speakerChoice === 'AI' || currentRound?.speakerChoice === 'AI' ? 'none' : '3px solid #ddd',
-                  cursor: currentRound?.speakerChoice ? 'not-allowed' : 'pointer',
-                  opacity: currentRound?.speakerChoice && currentRound.speakerChoice !== 'AI' ? 0.5 : 1
-                }}
-              >
-                AI
-              </button>
-              <button
-                onClick={() => !currentRound?.speakerChoice && handleSpeakerChoice('Self')}
-                disabled={currentRound?.speakerChoice !== null}
-                style={{
-                  padding: '60px 20px',
-                  borderRadius: '16px',
-                  fontWeight: 'bold',
-                  fontSize: '32px',
-                  backgroundColor: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? '#10B981' : 'white',
-                  color: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? 'white' : 'black',
-                  border: speakerChoice === 'Self' || currentRound?.speakerChoice === 'Self' ? 'none' : '3px solid #ddd',
-                  cursor: currentRound?.speakerChoice ? 'not-allowed' : 'pointer',
-                  opacity: currentRound?.speakerChoice && currentRound.speakerChoice !== 'Self' ? 0.5 : 1
-                }}
-              >
-                Self
-              </button>
-            </div>
-
-            {speakerChoice === 'Self' && !currentRound?.speakerChoice && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Your Answer</label>
-                <textarea
-                  value={selfAnswer}
-                  onChange={(e) => setSelfAnswer(e.target.value)}
-                  placeholder="Type your answer..."
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg text-lg"
-                  rows={4}
-                />
-              </div>
-            )}
-
-            {speakerChoice === 'AI' && currentRound?.aiAnswerPrivate && currentRound.aiAnswerPrivateFor === me?.id && (
-              <div style={{padding: '20px', backgroundColor: '#F3E8FF', border: '2px solid #9333EA', borderRadius: '12px'}}>
-                <p style={{fontSize: '14px', fontWeight: '600', color: '#581C87', marginBottom: '10px'}}>AI Preview (only you see this):</p>
-                <p style={{fontSize: '18px', color: 'black'}}>{currentRound.aiAnswerPrivate}</p>
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div style={{marginBottom: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // RB-E: Vote
-  if (currentScreen === 'RB-E') {
-    return (
-      <div className="min-h-screen flex flex-col p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
-          <h1 className="text-4xl font-bold text-center mb-6" style={{color: '#0045FF'}}>Vote</h1>
-          <p className="text-2xl text-center mb-12" style={{color: 'black'}}>Was that AI or Self?</p>
-
-          <div className="flex-1 flex flex-col gap-6 justify-center">
-            <button
-              onClick={() => !hasVoted && isVotingOpen && handleVote('AI')}
-              disabled={hasVoted || !isVotingOpen}
-              style={{
-                padding: '80px 40px',
-                borderRadius: '16px',
-                fontWeight: 'bold',
-                fontSize: '48px',
-                backgroundColor: (hasVoted && myVote === 'AI') ? '#9333EA' : (hasVoted || !isVotingOpen) ? '#ddd' : '#A855F7',
-                color: (hasVoted || !isVotingOpen) ? '#999' : 'white',
-                border: 'none',
-                cursor: (hasVoted || !isVotingOpen) ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              {hasVoted && myVote === 'AI' ? '✓ AI' : 'AI'}
-            </button>
-
-            <button
-              onClick={() => !hasVoted && isVotingOpen && handleVote('Self')}
-              disabled={hasVoted || !isVotingOpen}
-              style={{
-                padding: '80px 40px',
-                borderRadius: '16px',
-                fontWeight: 'bold',
-                fontSize: '48px',
-                backgroundColor: (hasVoted && myVote === 'Self') ? '#10B981' : (hasVoted || !isVotingOpen) ? '#ddd' : '#34D399',
-                color: (hasVoted || !isVotingOpen) ? '#999' : 'white',
-                border: 'none',
-                cursor: (hasVoted || !isVotingOpen) ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              {hasVoted && myVote === 'Self' ? '✓ Self' : 'Self'}
-            </button>
-          </div>
-
-          {hasVoted && (
-            <p className="text-center text-xl mt-6" style={{color: '#0045FF', fontWeight: 'bold'}}>Vote locked ✓</p>
-          )}
-
-          {!isVotingOpen && !hasVoted && (
-            <p className="text-center text-xl mt-6" style={{color: '#c00', fontWeight: 'bold'}}>Voting closed</p>
-          )}
-
-          {error && (
-            <div style={{marginTop: '20px', padding: '12px', backgroundColor: '#fee', borderRadius: '8px'}}>
-              <p style={{color: '#c00', textAlign: 'center', margin: 0}}>{getErrorMessage(error)}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // RB-F: Result
-  if (currentScreen === 'RB-F') {
-    const wasCorrect = myVote === currentRound?.speakerChoice;
-    const fooledMajority = currentRound?.result?.fooledMajority || false;
-
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{backgroundColor: '#F5F5F5'}}>
-        <div className="text-center">
-          <h1 className="text-5xl font-bold mb-8" style={{color: '#0045FF'}}>Result</h1>
-
-          <div className="mb-8">
-            <p className="text-2xl mb-4" style={{color: '#666'}}>It was</p>
-            <p className="text-8xl font-bold mb-8" style={{color: 'black'}}>{currentRound?.speakerChoice}</p>
-
-            {isSpeaker ? (
-              <div>
-                <p className="text-3xl mb-4" style={{color: 'black'}}>
-                  {fooledMajority ? "You fooled them! ✨" : "They guessed it!"}
-                </p>
-                <p className="text-5xl font-bold" style={{color: fooledMajority ? '#10B981' : '#666'}}>
-                  {fooledMajority ? "+1 point" : "No points"}
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-3xl mb-4" style={{color: 'black'}}>
-                  {wasCorrect ? "You were right! ✅" : "Close! ❌"}
-                </p>
-                <p className="text-5xl font-bold" style={{color: wasCorrect ? '#10B981' : '#666'}}>
-                  {wasCorrect ? "+1 point" : "No points"}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <p className="text-xl" style={{color: '#666'}}>Waiting for next round...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
 }
