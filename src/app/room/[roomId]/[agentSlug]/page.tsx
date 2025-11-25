@@ -639,7 +639,10 @@ const fetchPlayerScores = async (): Promise<void> => {
         agentName,
         roomId,
         codeWord: assignedCodeWord ?? null,
-        isSpy: isSpyRole
+        isSpy: isSpyRole,
+        score: 0,
+        roundsAgoWasSpy: 5,
+        platform: 'web'
       });
 
       setAgentId(agentSlug);
