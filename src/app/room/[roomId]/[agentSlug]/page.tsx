@@ -900,41 +900,9 @@ const fetchPlayerScores = async (): Promise<void> => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
-      style={{
-        backgroundColor: '#0A0A0A',
-        backgroundImage: `
-          radial-gradient(circle at 20% 30%, rgba(253, 216, 4, 0.03) 0%, transparent 50%),
-          radial-gradient(circle at 80% 70%, rgba(253, 216, 4, 0.02) 0%, transparent 50%)
-        `
-      }}
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{ backgroundColor: '#F9FAFB' }}
     >
-      {/* Brutalist Grid Background */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: `
-            linear-gradient(rgba(253, 216, 4, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(253, 216, 4, 0.03) 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Corner Dots */}
-      <div style={{ position: 'absolute', top: '20px', left: '20px', display: 'flex', gap: '6px' }}>
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-      </div>
-      <div style={{ position: 'absolute', top: '20px', right: '20px', display: 'flex', gap: '6px' }}>
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-        <div style={{ width: '6px', height: '6px', backgroundColor: '#FDD804', borderRadius: '50%' }} />
-      </div>
-
       {/* Show the removed alert if the player has been removed */}
       {hasBeenRemoved && (
         <RemovedAlert onClose={() => {
@@ -942,29 +910,13 @@ const fetchPlayerScores = async (): Promise<void> => {
         }} />
       )}
 
-      <div className={`w-full max-w-md transform transition-all duration-300 relative z-10 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
-        {/* Title */}
-        <h1
-          className="text-center mb-8"
-          style={{
-            fontSize: '48px',
-            fontWeight: 400,
-            color: '#FDD804',
-            fontFamily: 'var(--font-barrio)',
-            lineHeight: 1.2,
-            textShadow: '0 0 20px rgba(253, 216, 4, 0.3)',
-          }}
-        >
-          WHO&apos;S THE SPY
-        </h1>
-
+      <div className={`w-full max-w-md transform transition-all duration-300 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
         {error && (
           <div
             className="mb-6 p-4"
             style={{
-              backgroundColor: 'rgba(220, 38, 38, 0.1)',
-              border: '2px solid #DC2626',
-              borderRadius: '8px',
+              backgroundColor: '#FEE2E2',
+              borderRadius: '16px',
             }}
           >
             <p
@@ -972,7 +924,7 @@ const fetchPlayerScores = async (): Promise<void> => {
               style={{
                 fontWeight: 500,
                 fontSize: '18px',
-                color: '#FF5555',
+                color: '#DC2626',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
@@ -988,11 +940,10 @@ const fetchPlayerScores = async (): Promise<void> => {
               <p
                 className="text-center"
                 style={{
-                  fontSize: '14px',
-                  fontWeight: 700,
+                  fontSize: '16px',
+                  fontWeight: 600,
                   color: '#666666',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '2px',
                 }}
               >
                 ROOM: {roomId}
@@ -1004,13 +955,12 @@ const fetchPlayerScores = async (): Promise<void> => {
               <div
                 className="mb-6 p-4 flex items-center justify-center gap-2"
                 style={{
-                  backgroundColor: isSpy ? 'rgba(253, 216, 4, 0.1)' : isRedSpymaster ? 'rgba(220, 38, 38, 0.1)' : 'rgba(37, 99, 235, 0.1)',
-                  border: `2px solid ${isSpy ? '#FDD804' : isRedSpymaster ? '#DC2626' : '#2563EB'}`,
-                  borderRadius: '8px',
+                  backgroundColor: isSpy ? '#E5E7EB' : isRedSpymaster ? '#FEE2E2' : '#DBEAFE',
+                  borderRadius: '16px',
                 }}
               >
                 {isSpy ? (
-                  <Eye style={{ width: '24px', height: '24px', color: '#FDD804' }} />
+                  <Eye style={{ width: '24px', height: '24px', color: '#000000' }} />
                 ) : (
                   <Crown
                     style={{
@@ -1024,9 +974,8 @@ const fetchPlayerScores = async (): Promise<void> => {
                   style={{
                     fontSize: '20px',
                     fontWeight: 700,
-                    color: isSpy ? '#FDD804' : isRedSpymaster ? '#DC2626' : '#2563EB',
+                    color: isSpy ? '#000000' : isRedSpymaster ? '#DC2626' : '#2563EB',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    letterSpacing: '1px',
                   }}
                 >
                   {getRoleDisplay()}
@@ -1037,24 +986,22 @@ const fetchPlayerScores = async (): Promise<void> => {
             {/* Agent Name */}
             <div className="mb-6">
               <p
-                className="mb-3"
+                className="mb-2"
                 style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
+                  fontSize: '18px',
+                  fontWeight: 600,
                   color: '#666666',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase',
                 }}
               >
-                AGENT NAME
+                Your Name
               </p>
               <div
                 className="p-6"
                 style={{
-                  backgroundColor: '#1A1A1A',
-                  border: '2px solid #333333',
-                  borderRadius: '8px',
+                  backgroundColor: '#FFFFFF',
+                  border: '3px solid #E5E7EB',
+                  borderRadius: '20px',
                 }}
               >
                 <p
@@ -1062,7 +1009,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                   style={{
                     fontSize: '32px',
                     fontWeight: 700,
-                    color: '#FFFFFF',
+                    color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >
@@ -1074,14 +1021,12 @@ const fetchPlayerScores = async (): Promise<void> => {
             {/* Code Sign / Spy Status */}
             <div>
               <p
-                className="mb-3 text-center"
+                className="mb-4 text-center"
                 style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
+                  fontSize: '18px',
+                  fontWeight: 600,
                   color: '#666666',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase',
                 }}
               >
                 {isSpy ? 'Your Status' : 'Your Code Sign'}
@@ -1096,10 +1041,9 @@ const fetchPlayerScores = async (): Promise<void> => {
                 <div
                   className="p-8"
                   style={{
-                    backgroundColor: '#1A1A1A',
-                    border: '2px solid #FDD804',
-                    borderRadius: '8px',
-                    boxShadow: '0 0 20px rgba(253, 216, 4, 0.2)',
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '20px',
                   }}
                 >
                   <p
@@ -1107,10 +1051,8 @@ const fetchPlayerScores = async (): Promise<void> => {
                     style={{
                       fontSize: '64px',
                       fontWeight: 900,
-                      color: '#FDD804',
+                      color: '#000000',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      textShadow: '0 0 20px rgba(253, 216, 4, 0.5)',
-                      letterSpacing: '4px',
                     }}
                   >
                     SPY
@@ -1120,9 +1062,9 @@ const fetchPlayerScores = async (): Promise<void> => {
                 <div
                   className="p-8 flex items-center justify-center"
                   style={{
-                    backgroundColor: '#1A1A1A',
-                    border: '2px solid #333333',
-                    borderRadius: '8px',
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '20px',
                     minHeight: '280px',
                   }}
                 >
@@ -1135,13 +1077,13 @@ const fetchPlayerScores = async (): Promise<void> => {
           <div className="text-center py-12">
             <AlertCircle
               className="mx-auto mb-4"
-              style={{ width: '48px', height: '48px', color: '#FF5555' }}
+              style={{ width: '48px', height: '48px', color: '#DC2626' }}
             />
             <p
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: '#FFFFFF',
+                color: '#000000',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
@@ -1167,12 +1109,10 @@ const fetchPlayerScores = async (): Promise<void> => {
             <p
               className="mb-4 text-center"
               style={{
-                fontSize: '12px',
-                fontWeight: 700,
+                fontSize: '18px',
+                fontWeight: 600,
                 color: '#666666',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                letterSpacing: '2px',
-                textTransform: 'uppercase',
               }}
             >
               Possible Code Signs
@@ -1183,9 +1123,9 @@ const fetchPlayerScores = async (): Promise<void> => {
                   key={word}
                   className="p-2 flex items-center justify-center"
                   style={{
-                    backgroundColor: '#1A1A1A',
-                    border: '2px solid #333333',
-                    borderRadius: '8px',
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #E5E7EB',
+                    borderRadius: '16px',
                     aspectRatio: '1/1',
                   }}
                 >
