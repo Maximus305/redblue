@@ -880,9 +880,10 @@ const fetchPlayerScores = async (): Promise<void> => {
 
         {agentId && codeWord ? (
           <>
-            {/* Room Info & Actions */}
-            <div className="mb-6 flex justify-between items-center">
+            {/* Room Info */}
+            <div className="mb-6">
               <p
+                className="text-center"
                 style={{
                   fontSize: '16px',
                   fontWeight: 600,
@@ -892,22 +893,6 @@ const fetchPlayerScores = async (): Promise<void> => {
               >
                 ROOM: {roomId}
               </p>
-              <button
-                onClick={handleShowScores}
-                style={{
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  background: '#FDD804',
-                  border: 'none',
-                  borderRadius: '100px',
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                }}
-              >
-                VIEW SCOREBOARD
-              </button>
             </div>
 
             {/* Role Badge */}
