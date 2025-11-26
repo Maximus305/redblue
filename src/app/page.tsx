@@ -137,14 +137,16 @@ export default function PartykiteLanding() {
       <section className="pt-20 pb-32">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="mb-8">
-            <span className="text-6xl">🎉</span>
+            <h1 className="text-6xl md:text-8xl font-black mb-4 leading-tight" style={{ fontFamily: 'var(--font-barrio)', color: '#FDD804', textShadow: '3px 3px 0px #000000' }}>
+              WHO&apos;S THE SPY
+            </h1>
           </div>
-          
-          <h1 className="text-6xl md:text-8xl font-black mb-8 leading-tight text-gray-900">
+
+          <h2 className="text-4xl md:text-5xl font-black mb-8 leading-tight text-gray-900">
             ULTIMATE
             <br />
             PARTY GAMES
-          </h1>
+          </h2>
           
           <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
             Transform any gathering into an unforgettable experience with our collection of 

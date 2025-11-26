@@ -735,6 +735,21 @@ const fetchPlayerScores = async (): Promise<void> => {
         style={{ backgroundColor: '#F9FAFB' }}
       >
         <div className="w-full max-w-md">
+          {/* Title */}
+          <h1
+            className="text-center mb-8"
+            style={{
+              fontSize: '48px',
+              fontWeight: 400,
+              color: '#FDD804',
+              fontFamily: 'var(--font-barrio)',
+              textShadow: '3px 3px 0px #000000',
+              lineHeight: 1.2,
+            }}
+          >
+            WHO&apos;S THE SPY
+          </h1>
+
           {/* Message */}
           <p
             className="text-center mb-6"
