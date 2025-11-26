@@ -114,6 +114,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   // const [iconSize, setIconSize] = useState(80);
   const [commonCodeWord, setCommonCodeWord] = useState<string | undefined>(undefined);
   const [isUpdatingSpyStatus, setIsUpdatingSpyStatus] = useState(false);
+  const [playerCount, setPlayerCount] = useState(0);
 
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket', 'Barrel',
@@ -515,6 +516,16 @@ const fetchPlayerScores = async (): Promise<void> => {
     }
   }, [agentName, agentId, roomId, agentSlug]);
 
+  // Listen to player count changes
+  useEffect(() => {
+    const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
+    const unsubscribe = onSnapshot(agentsQuery, (snapshot) => {
+      setPlayerCount(snapshot.docs.length);
+    });
+
+    return () => unsubscribe();
+  }, [roomId]);
+
   const updateAgentForSpyMode = async (settings: SettingsData) => {
     const agentKey = `${roomId}_${agentSlug}`;
     const agentRef = doc(db, "agents", agentKey);
@@ -737,7 +748,7 @@ const fetchPlayerScores = async (): Promise<void> => {
         <div className="w-full max-w-md">
           {/* Title */}
           <h1
-            className="text-center mb-8"
+            className="text-center mb-12"
             style={{
               fontSize: '48px',
               fontWeight: 400,
@@ -749,23 +760,48 @@ const fetchPlayerScores = async (): Promise<void> => {
             WHO&apos;S THE SPY
           </h1>
 
-          {/* Message */}
+          {/* Message with pulsing dot */}
+          <div className="text-center mb-10" style={{ animation: 'breathe 2s ease-in-out infinite' }}>
+            <p
+              className="inline-flex items-center gap-2"
+              style={{
+                fontSize: '32px',
+                fontWeight: 600,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                lineHeight: 1.5,
+              }}
+            >
+              Waiting for Host to start
+              <span
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  backgroundColor: '#FDD804',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}
+              />
+            </p>
+          </div>
+
+          {/* Player Count */}
           <p
-            className="text-center mb-6"
+            className="text-center mb-10"
             style={{
-              fontSize: '28px',
+              fontSize: '18px',
               fontWeight: 600,
-              color: '#000000',
+              color: '#666666',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              lineHeight: 1.5,
             }}
           >
-            Waiting for Host to start.
+            {playerCount} {playerCount === 1 ? 'player' : 'players'} waiting
           </p>
 
           {/* Room Code */}
           <p
-            className="text-center mb-8"
+            className="text-center mb-12"
             style={{
               fontSize: '20px',
               fontWeight: 600,
@@ -778,7 +814,7 @@ const fetchPlayerScores = async (): Promise<void> => {
 
           {/* QR Code */}
           <div
-            className="mb-6 p-4 mx-auto"
+            className="mb-10 p-4 mx-auto"
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '20px',
@@ -795,7 +831,7 @@ const fetchPlayerScores = async (): Promise<void> => {
 
           {/* Info Text */}
           <p
-            className="text-center mb-8"
+            className="text-center mb-12"
             style={{
               fontSize: '16px',
               fontWeight: 400,
@@ -808,17 +844,18 @@ const fetchPlayerScores = async (): Promise<void> => {
 
           {/* Agent Info */}
           <div
-            className="p-4"
+            className="p-6"
             style={{
-              backgroundColor: '#FDD804',
+              backgroundColor: '#FFFFFF',
+              border: '3px solid #E5E7EB',
               borderRadius: '20px',
             }}
           >
             <p
               className="text-center"
               style={{
-                fontSize: '20px',
-                fontWeight: 600,
+                fontSize: '28px',
+                fontWeight: 700,
                 color: '#000000',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
@@ -827,6 +864,25 @@ const fetchPlayerScores = async (): Promise<void> => {
             </p>
           </div>
         </div>
+
+        <style jsx>{`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.3;
+            }
+          }
+          @keyframes breathe {
+            0%, 100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.02);
+            }
+          }
+        `}</style>
       </div>
     );
   }
