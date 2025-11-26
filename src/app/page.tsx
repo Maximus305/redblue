@@ -137,7 +137,7 @@ export default function PartykiteLanding() {
       <section className="pt-20 pb-32">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="mb-8">
-            <h1 className="text-6xl md:text-8xl font-black mb-4 leading-tight" style={{ fontFamily: 'var(--font-barrio)', color: '#FDD804', textShadow: '3px 3px 0px #000000' }}>
+            <h1 className="text-6xl md:text-8xl font-black mb-4 leading-tight" style={{ fontFamily: 'var(--font-barrio)', color: '#000000' }}>
               WHO&apos;S THE SPY
             </h1>
           </div>

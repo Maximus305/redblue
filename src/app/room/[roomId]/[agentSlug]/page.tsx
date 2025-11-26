@@ -741,9 +741,8 @@ const fetchPlayerScores = async (): Promise<void> => {
             style={{
               fontSize: '48px',
               fontWeight: 400,
-              color: '#FDD804',
+              color: '#000000',
               fontFamily: 'var(--font-barrio)',
-              textShadow: '3px 3px 0px #000000',
               lineHeight: 1.2,
             }}
           >
