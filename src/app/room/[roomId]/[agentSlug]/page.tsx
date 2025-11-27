@@ -1,6 +1,7 @@
 "use client"
-import React, { useState, useEffect, use, useMemo } from "react";
-import { Loader2, Crown, AlertCircle, Eye, X } from 'lucide-react';
+import React, { useState, useEffect, use, useMemo, useRef } from "react";
+import { Loader2, Crown, AlertCircle, X } from 'lucide-react';
+import { Check } from '@phosphor-icons/react/dist/ssr';
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -10,9 +11,7 @@ import {
   collection,
   query,
   getDocs,
-  where,
-
-
+  where
 } from "firebase/firestore";
 import { IconForWord } from '@/utils/codeWords';
 import { useRouter } from "next/navigation";
@@ -36,6 +35,7 @@ interface SettingsData {
   spyAgent?: string;
   spyAgents?: string[];
   gameStarted?: boolean;
+  votingStarted?: boolean;
 }
 
 interface RoomInfo {
@@ -114,7 +114,19 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   // const [iconSize, setIconSize] = useState(80);
   const [commonCodeWord, setCommonCodeWord] = useState<string | undefined>(undefined);
   const [isUpdatingSpyStatus, setIsUpdatingSpyStatus] = useState(false);
-  const [playerCount, setPlayerCount] = useState(0);
+  const [, setPlayerCount] = useState(0);
+  const [, setShowRoleReveal] = useState(false);
+  const [, setRevealRole] = useState<'agent' | 'spy' | null>(null);
+  const [allAgents, setAllAgents] = useState<Array<{id: string, name: string}>>([]);
+  const hasShownReveal = useRef(false);
+  const [votingStarted, setVotingStarted] = useState(false);
+  const [, setHasVoted] = useState(false);
+  const [selectedVote, setSelectedVote] = useState<string | null>(null);
+  const [allVotes, setAllVotes] = useState<Record<string, string>>({});
+  const [votingComplete, setVotingComplete] = useState(false);
+  const [votingResults, setVotingResults] = useState<{ spyId: string; spyName: string; wasCorrect: boolean } | null>(null);
+  const [showVotingScreen, setShowVotingScreen] = useState(false);
+  const [showWaitingScreen, setShowWaitingScreen] = useState(false);
 
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket', 'Barrel',
@@ -122,28 +134,44 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     'Bullet', 'Camera', 'Car', 'Castle', 'Chair',
     'Clock', 'Crate', 'Crown', 'Diamond', 'Dice',
     'Door', 'Envelope', 'Gun', 'Hack', 'Hammer',
-    'Key', 'Lantern', 'Lock', 'Marker', 'Max',
+    'Key', 'Lantern', 'Lock', 'Marker',
     'Outlet', 'Paintbrush', 'Racecar', 'Ring', 'Rocket',
     'Rope', 'Rubiks', 'Tent', 'Tire', 'Wrench'
   ];
 
   // Generate 6 random words including the common code word for spy view
+  // Use roomId as seed to keep consistent across reloads
   const spyCodeWords = useMemo(() => {
     if (!commonCodeWord || commonCodeWord === 'spy') {
       // Fallback: return 6 random words if no common code word
-      const shuffled = [...allCodeWords].sort(() => Math.random() - 0.5);
+      // Use roomId to seed the selection
+      const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+      const shuffled = [...allCodeWords].sort((a, b) => {
+        const hashA = (a.charCodeAt(0) + seed) % allCodeWords.length;
+        const hashB = (b.charCodeAt(0) + seed) % allCodeWords.length;
+        return hashA - hashB;
+      });
       return shuffled.slice(0, 6);
     }
 
     // Get 5 random words excluding the common code word
     const otherWords = allCodeWords.filter(w => w !== commonCodeWord);
-    const shuffled = otherWords.sort(() => Math.random() - 0.5);
+    const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+    const shuffled = otherWords.sort((a, b) => {
+      const hashA = (a.charCodeAt(0) + seed) % otherWords.length;
+      const hashB = (b.charCodeAt(0) + seed) % otherWords.length;
+      return hashA - hashB;
+    });
     const randomFive = shuffled.slice(0, 5);
 
     // Combine with common code word and shuffle again
-    const result = [...randomFive, commonCodeWord].sort(() => Math.random() - 0.5);
+    const result = [...randomFive, commonCodeWord].sort((a, b) => {
+      const hashA = (a.charCodeAt(0) + seed) % 6;
+      const hashB = (b.charCodeAt(0) + seed) % 6;
+      return hashA - hashB;
+    });
     return result;
-  }, [commonCodeWord]);
+  }, [commonCodeWord, roomId]);
 
   // Add this useEffect to handle responsive icon sizing:
   // useEffect(() => {
@@ -162,6 +190,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
 
   // Player score functions
   // Improved fetchPlayerScores function with better iOS player deduplication
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const fetchPlayerScores = async (): Promise<void> => {
   setLoadingScores(true);
   try {
@@ -368,6 +397,7 @@ const fetchPlayerScores = async (): Promise<void> => {
           setGameMode(currentGameMode);
 
           setGameStarted(settings.gameStarted === true);
+          setVotingStarted(settings.votingStarted === true);
           setCommonCodeWord(settings.commonCodeWord);
 
           if (currentGameMode === 'spy') {
@@ -516,15 +546,153 @@ const fetchPlayerScores = async (): Promise<void> => {
     }
   }, [agentName, agentId, roomId, agentSlug]);
 
-  // Listen to player count changes
+  // Listen to player count changes and get all agents
   useEffect(() => {
     const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
     const unsubscribe = onSnapshot(agentsQuery, (snapshot) => {
       setPlayerCount(snapshot.docs.length);
+      const agents = snapshot.docs.map(doc => {
+        const rawId = doc.id;
+        // Remove room code prefix (e.g., "CPQS-E9H4_james" -> "james")
+        const cleanId = rawId.includes('_') ? rawId.split('_')[1] : rawId;
+        const name = doc.data().agentName || cleanId;
+        return {
+          id: rawId, // Keep full ID for key purposes
+          name: name
+        };
+      });
+      setAllAgents(agents);
     });
 
     return () => unsubscribe();
   }, [roomId]);
+
+  // Show role reveal when game starts
+  useEffect(() => {
+    if (gameStarted && (isSpy !== undefined) && codeWord && !hasShownReveal.current) {
+      hasShownReveal.current = true;
+      setRevealRole(isSpy ? 'spy' : 'agent');
+      setShowRoleReveal(true);
+
+      // Hide after 3 seconds
+      const timer = setTimeout(() => {
+        setShowRoleReveal(false);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [gameStarted, isSpy, codeWord]);
+
+  // Navigate to voting screen when votingStarted becomes true
+  useEffect(() => {
+    if (votingStarted && gameStarted) {
+      setShowVotingScreen(true);
+      setShowWaitingScreen(false);
+    }
+  }, [votingStarted, gameStarted]);
+
+  // Listen for votes and determine when voting is complete
+  useEffect(() => {
+    if (!votingStarted || !roomId) return;
+
+    const votesRef = collection(db, 'votes', roomId, 'players');
+    const unsubscribe = onSnapshot(votesRef, async (snapshot) => {
+      const votes: Record<string, string> = {};
+      snapshot.docs.forEach(doc => {
+        votes[doc.id] = doc.data().votedFor;
+      });
+      setAllVotes(votes);
+
+      // Check if all players have voted
+      const totalPlayers = allAgents.length;
+      const totalVotes = snapshot.docs.length;
+
+      if (totalVotes === totalPlayers && totalPlayers > 0) {
+        // Voting is complete, calculate results
+        setVotingComplete(true);
+
+        // Count votes
+        const voteCounts: Record<string, number> = {};
+        snapshot.docs.forEach(doc => {
+          const votedFor = doc.data().votedFor;
+          voteCounts[votedFor] = (voteCounts[votedFor] || 0) + 1;
+        });
+
+        // Find player with most votes
+        let maxVotes = 0;
+        let suspectedSpyId = '';
+        Object.entries(voteCounts).forEach(([playerId, count]) => {
+          if (count > maxVotes) {
+            maxVotes = count;
+            suspectedSpyId = playerId;
+          }
+        });
+
+        // Get the actual spy ID from settings
+        const settingsRef = doc(db, "settings", roomId);
+        const settingsDoc = await getDoc(settingsRef);
+        if (settingsDoc.exists()) {
+          const settings = settingsDoc.data() as SettingsData;
+          console.log('🕵️ SPY DETECTION:', {
+            spyAgent: settings.spyAgent,
+            allAgents: allAgents,
+            roomId
+          });
+          const actualSpySlug = settings.spyAgent?.includes('_')
+            ? settings.spyAgent.split('_')[1]
+            : settings.spyAgent;
+          const actualSpyId = `${roomId}_${actualSpySlug}`;
+          console.log('🎯 SPY ID CALCULATED:', {
+            actualSpySlug,
+            actualSpyId,
+            suspectedSpyId
+          });
+
+          // Get spy name - try to find in allAgents first, otherwise use the slug
+          let spyName = allAgents.find(a => a.id === actualSpyId)?.name || '';
+
+          // If not found in allAgents (e.g., host), try to get from agents collection
+          if (!spyName) {
+            const spyAgentRef = doc(db, "agents", actualSpyId);
+            const spyAgentDoc = await getDoc(spyAgentRef);
+            if (spyAgentDoc.exists()) {
+              spyName = spyAgentDoc.data().agentName || actualSpySlug || 'Unknown';
+            } else {
+              spyName = actualSpySlug || 'Unknown'; // Fallback to slug
+            }
+          }
+
+          // Check if the vote was correct
+          const wasCorrect = suspectedSpyId === actualSpyId;
+          setVotingResults({ spyId: actualSpyId, spyName, wasCorrect });
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [votingStarted, roomId, allAgents.length]);
+
+  // Listen for new round starting (votes being cleared)
+  useEffect(() => {
+    if (!votingComplete || !roomId) return;
+
+    const votesRef = collection(db, 'votes', roomId, 'players');
+    const unsubscribe = onSnapshot(votesRef, (snapshot) => {
+      // If we're on results screen and votes collection becomes empty, new round started
+      if (snapshot.docs.length === 0 && votingComplete) {
+        console.log('🔄 New round detected - votes cleared');
+        // Reset all voting state
+        setVotingComplete(false);
+        setVotingResults(null);
+        setShowVotingScreen(false);
+        setShowWaitingScreen(false);
+        setSelectedVote(null);
+        setAllVotes({});
+      }
+    });
+
+    return () => unsubscribe();
+  }, [votingComplete, roomId]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
     const agentKey = `${roomId}_${agentSlug}`;
@@ -686,10 +854,6 @@ const fetchPlayerScores = async (): Promise<void> => {
     }
   };
 
-  const handleShowScores = () => {
-    fetchPlayerScores();
-    setShowScores(true);
-  };
 
   // const leaveRoom = () => {
   //   router.push('/');
@@ -739,7 +903,19 @@ const fetchPlayerScores = async (): Promise<void> => {
     );
   }
 
-  if (!loading && !error && !gameStarted) {
+  // Show loading state with gray background
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: '#F9FAFB' }}
+      >
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#000000' }} />
+      </div>
+    );
+  }
+
+  if (!error && !gameStarted) {
     return (
       <div
         className="min-h-screen flex items-center justify-center p-6"
@@ -750,119 +926,129 @@ const fetchPlayerScores = async (): Promise<void> => {
           <h1
             className="text-center mb-12"
             style={{
-              fontSize: '48px',
+              fontSize: '56px',
               fontWeight: 400,
               color: '#000000',
               fontFamily: 'var(--font-barrio)',
-              lineHeight: 1.2,
+              lineHeight: 1.1,
             }}
           >
             WHO&apos;S THE SPY
           </h1>
 
-          {/* Message with pulsing dot */}
-          <div className="text-center mb-10" style={{ animation: 'breathe 2s ease-in-out infinite' }}>
-            <p
-              className="inline-flex items-center gap-2"
-              style={{
-                fontSize: '32px',
-                fontWeight: 600,
-                color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                lineHeight: 1.5,
-              }}
-            >
-              Waiting for Host to start
-              <span
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  backgroundColor: '#FDD804',
-                  borderRadius: '50%',
-                  display: 'inline-block',
-                  animation: 'pulse 1.5s ease-in-out infinite'
-                }}
-              />
-            </p>
-          </div>
-
-          {/* Player Count */}
-          <p
-            className="text-center mb-10"
-            style={{
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#666666',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            {playerCount} {playerCount === 1 ? 'player' : 'players'} waiting
-          </p>
-
-          {/* Room Code */}
-          <p
-            className="text-center mb-12"
-            style={{
-              fontSize: '20px',
-              fontWeight: 600,
-              color: '#000000',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            ROOM: {roomId}
-          </p>
-
           {/* QR Code */}
           <div
-            className="mb-10 p-4 mx-auto"
+            className="mb-8 p-6 mx-auto"
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '20px',
-              maxWidth: '280px',
+              borderRadius: '16px',
+              border: '2px solid #E5E5E5',
+              width: '85%',
+              aspectRatio: '1/1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
             }}
           >
+            {/* Room Code at top */}
+            <p
+              style={{
+                position: 'absolute',
+                top: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '20px',
+                fontWeight: 700,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                margin: 0,
+                letterSpacing: '2px',
+              }}
+            >
+              {roomId}
+            </p>
+
+            {/* Left side metadata (centered vertically) */}
+            <span style={{
+              position: 'absolute',
+              top: '50%',
+              left: '16px',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#666666',
+              fontFamily: 'monospace',
+              transform: 'translateY(-50%) rotate(90deg)',
+            }}>
+              CLR-{Math.floor(Math.random() * 9000 + 1000)}
+            </span>
+
+            {/* Right side metadata (centered vertically) */}
+            <span style={{
+              position: 'absolute',
+              top: '50%',
+              right: '16px',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: '#666666',
+              fontFamily: 'monospace',
+              transform: 'translateY(-50%) rotate(-90deg)',
+            }}>
+              CLASSIFIED
+            </span>
+
+            {/* Bottom text (normal) */}
+            <p
+              style={{
+                position: 'absolute',
+                bottom: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '24px',
+                fontWeight: 700,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                margin: 0,
+              }}
+            >
+              Scan to join
+            </p>
+
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
               size={240}
               level="M"
-              className="mx-auto"
             />
           </div>
 
-          {/* Info Text */}
-          <p
-            className="text-center mb-12"
-            style={{
-              fontSize: '16px',
-              fontWeight: 400,
-              color: '#666666',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            Share this QR code with others to join
-          </p>
-
-          {/* Agent Info */}
-          <div
-            className="p-6"
-            style={{
-              backgroundColor: '#FFFFFF',
-              border: '3px solid #E5E7EB',
-              borderRadius: '20px',
-            }}
-          >
-            <p
-              className="text-center"
-              style={{
-                fontSize: '28px',
-                fontWeight: 700,
-                color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              }}
-            >
-              {agentName || agentId || 'Agent'}
-            </p>
-          </div>
+          {/* All Players */}
+          {allAgents.map((agent) => {
+            const isMe = agent.id === `${roomId}_${agentSlug}`;
+            return (
+              <div
+                key={agent.id}
+                className="p-3 mb-3 mx-auto"
+                style={{
+                  backgroundColor: isMe ? '#FDD804' : '#FFFFFF',
+                  border: isMe ? 'none' : '2px solid #E5E5E5',
+                  borderRadius: '9999px',
+                  width: '70%',
+                }}
+              >
+                <p
+                  className="text-center"
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: '#000000',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  }}
+                >
+                  {agent.name}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
         <style jsx>{`
@@ -887,21 +1073,12 @@ const fetchPlayerScores = async (): Promise<void> => {
     );
   }
 
-  console.log('🎯 COMPONENT RENDER STATE:', {
-    isSpy,
-    codeWord,
-    agentId,
-    gameStarted,
-    gameMode,
-    isUpdatingSpyStatus,
-    loading,
-    error
-  });
-
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: '#F9FAFB' }}
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        backgroundColor: '#FDD804',
+      }}
     >
       {/* Show the removed alert if the player has been removed */}
       {hasBeenRemoved && (
@@ -910,7 +1087,185 @@ const fetchPlayerScores = async (): Promise<void> => {
         }} />
       )}
 
-      <div className={`w-full max-w-md transform transition-all duration-300 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+      {/* Voting Screen */}
+      {votingComplete ? (
+            <div className="w-full max-w-md">
+              {votingResults && (
+                <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
+                  <h1
+                    className="text-center"
+                    style={{
+                      fontSize: '56px',
+                      fontWeight: 900,
+                      color: '#000000',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      lineHeight: 1.2,
+                      marginBottom: '48px',
+                    }}
+                  >
+                    The spy was
+                  </h1>
+                  <div className="w-full p-10" style={{
+                    backgroundColor: '#000000',
+                    borderRadius: '24px',
+                  }}>
+                    <p
+                      className="text-center"
+                      style={{
+                        fontSize: '52px',
+                        fontWeight: 900,
+                        color: '#FDD804',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      }}
+                    >
+                      {votingResults.spyName}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : showVotingScreen ? (
+        <div className="w-full max-w-md">
+          {/* Title with vote count */}
+          <h2
+            className="text-center"
+            style={{
+              fontSize: '48px',
+              fontWeight: 900,
+              color: '#000000',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              lineHeight: 1.2,
+              marginBottom: '40px',
+            }}
+          >
+            Who is the spy?
+          </h2>
+
+          {/* Player Cards */}
+          <div className="space-y-4 mb-8">
+            {allAgents.filter(agent => agent.id !== `${roomId}_${agentSlug}`).map((agent) => {
+              const isSelected = selectedVote === agent.id;
+
+              return (
+                <button
+                  key={agent.id}
+                  onClick={() => setSelectedVote(agent.id)}
+                  className="w-full transition-all"
+                  style={{
+                    backgroundColor: isSelected ? '#FDD804' : '#000000',
+                    border: isSelected ? '4px solid #000000' : 'none',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '24px 28px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '28px',
+                      fontWeight: 700,
+                      color: isSelected ? '#000000' : '#FDD804',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    }}
+                  >
+                    {agent.name}
+                  </span>
+                  {isSelected && (
+                    <Check
+                      size={36}
+                      weight="bold"
+                      color="#000000"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            onClick={async () => {
+              console.log('🗳️ VOTE BUTTON CLICKED', { selectedVote, agentId, roomId });
+              if (selectedVote && agentId) {
+                try {
+                  const votePath = `votes/${roomId}/players/${agentId}`;
+                  console.log('📝 Writing vote to:', votePath, { votedFor: selectedVote });
+                  const voteRef = doc(db, 'votes', roomId, 'players', agentId);
+                  await setDoc(voteRef, {
+                    votedFor: selectedVote,
+                    timestamp: new Date(),
+                    submitted: true
+                  });
+                  console.log('✅ Vote submitted successfully');
+                  setHasVoted(true);
+                  setShowVotingScreen(false);
+                  setShowWaitingScreen(true);
+                } catch (err) {
+                  console.error('❌ Error submitting vote:', err);
+                }
+              } else {
+                console.warn('⚠️ Cannot submit vote:', { selectedVote, agentId, reason: !selectedVote ? 'No vote selected' : 'No agentId' });
+              }
+            }}
+            disabled={!selectedVote}
+            className="w-full transition-all"
+            style={{
+              backgroundColor: selectedVote ? '#000000' : '#666666',
+              color: '#FDD804',
+              border: 'none',
+              borderRadius: '24px',
+              fontSize: '26px',
+              fontWeight: 900,
+              cursor: selectedVote ? 'pointer' : 'not-allowed',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              padding: '22px 0',
+              opacity: selectedVote ? 1 : 0.6,
+            }}
+          >
+            Submit Vote
+          </button>
+        </div>
+      ) : showWaitingScreen ? (
+        <div className="w-full max-w-md text-center">
+          <h1
+            className="mb-6"
+            style={{
+              fontSize: '48px',
+              fontWeight: 900,
+              color: '#000000',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            Waiting for votes...
+          </h1>
+          <p
+            style={{
+              fontSize: '24px',
+              fontWeight: 600,
+              color: '#666666',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            {Object.keys(allVotes).length} / {allAgents.length} voted
+          </p>
+        </div>
+      ) : (
+      <div className={`w-full max-w-md transform transition-all duration-300 relative z-10 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+        {/* Instructions */}
+        <h2
+          className="text-center mb-10"
+          style={{
+            fontSize: '52px',
+            fontWeight: 900,
+            color: '#000000',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            lineHeight: 1.1,
+          }}
+        >
+          Describe your sign in one word
+        </h2>
         {error && (
           <div
             className="mb-6 p-4"
@@ -935,8 +1290,8 @@ const fetchPlayerScores = async (): Promise<void> => {
 
         {agentId && codeWord ? (
           <>
-            {/* Room Info */}
-            <div className="mb-6">
+            {/* Room Info - Hidden, shown in header */}
+            <div className="mb-6" style={{ display: 'none' }}>
               <p
                 className="text-center"
                 style={{
@@ -950,31 +1305,28 @@ const fetchPlayerScores = async (): Promise<void> => {
               </p>
             </div>
 
-            {/* Role Badge */}
-            {(isAnySpymaster || isSpy) && (
+            {/* Role Badge - Only show for spymasters */}
+            {isAnySpymaster && !isSpy && (
               <div
                 className="mb-6 p-4 flex items-center justify-center gap-2"
                 style={{
-                  backgroundColor: isSpy ? '#E5E7EB' : isRedSpymaster ? '#FEE2E2' : '#DBEAFE',
-                  borderRadius: '16px',
+                  backgroundColor: isRedSpymaster ? '#3a1a1a' : '#1a2a3a',
+                  border: isRedSpymaster ? '1px solid #DC2626' : '1px solid #3B82F6',
+                  borderRadius: '12px',
                 }}
               >
-                {isSpy ? (
-                  <Eye style={{ width: '24px', height: '24px', color: '#000000' }} />
-                ) : (
-                  <Crown
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      color: isRedSpymaster ? '#DC2626' : '#2563EB',
-                    }}
-                  />
-                )}
+                <Crown
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    color: isRedSpymaster ? '#DC2626' : '#3B82F6',
+                  }}
+                />
                 <span
                   style={{
                     fontSize: '20px',
                     fontWeight: 700,
-                    color: isSpy ? '#000000' : isRedSpymaster ? '#DC2626' : '#2563EB',
+                    color: isRedSpymaster ? '#DC2626' : '#3B82F6',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >
@@ -983,92 +1335,109 @@ const fetchPlayerScores = async (): Promise<void> => {
               </div>
             )}
 
-            {/* Agent Name */}
-            <div className="mb-6">
-              <p
-                className="mb-2"
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#666666',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                }}
-              >
-                Your Name
-              </p>
-              <div
-                className="p-6"
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '3px solid #E5E7EB',
-                  borderRadius: '20px',
-                }}
-              >
+            {/* Agent Name - Only for non-spies */}
+            {!(isSpy || codeWord === 'spy') && (
+              <div className="mb-6">
                 <p
-                  className="text-center"
+                  className="mb-2 text-center"
                   style={{
-                    fontSize: '32px',
+                    fontSize: '20px',
                     fontWeight: 700,
                     color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >
-                  {agentName || agentId}
+                  OPERATIVE
                 </p>
+                <div
+                  className="p-4"
+                  style={{
+                    backgroundColor: '#000000',
+                    border: 'none',
+                    borderRadius: '12px',
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                      CLR-{Math.floor(Math.random() * 9000 + 1000)}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                      SECTOR {String.fromCharCode(65 + Math.floor(Math.random() * 26))}{Math.floor(Math.random() * 9)}
+                    </span>
+                  </div>
+                  <p
+                    className="text-center"
+                    style={{
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      color: '#FDD804',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    }}
+                  >
+                    {agentName || agentId}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Code Sign / Spy Status */}
             <div>
-              <p
-                className="mb-4 text-center"
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#666666',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                }}
-              >
-                {isSpy ? 'Your Status' : 'Your Code Sign'}
-              </p>
+              {!isSpy && codeWord !== 'spy' && (
+                <p
+                  className="mb-2 text-center"
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    color: '#000000',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  }}
+                >
+                  Code Sign
+                </p>
+              )}
 
               {(() => {
                 console.log('🎨 RENDERING:', { isSpy, codeWord, shouldShowSpy: isSpy || codeWord === 'spy' });
                 return null;
               })()}
 
-              {isSpy || codeWord === 'spy' ? (
+              {!(isSpy || codeWord === 'spy') && (
                 <div
-                  className="p-8"
+                  className="p-8 mx-auto"
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '3px solid #E5E7EB',
-                    borderRadius: '20px',
+                    backgroundColor: '#000000',
+                    border: 'none',
+                    borderRadius: '12px',
+                    width: '450px',
                   }}
                 >
-                  <p
-                    className="text-center"
-                    style={{
-                      fontSize: '64px',
-                      fontWeight: 900,
-                      color: '#000000',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    SPY
-                  </p>
-                </div>
-              ) : (
-                <div
-                  className="p-8 flex items-center justify-center"
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '3px solid #E5E7EB',
-                    borderRadius: '20px',
-                    minHeight: '280px',
-                  }}
-                >
-                  <IconForWord word={codeWord} size={240} />
+                  <div className="flex justify-between items-center mb-2">
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                      MISSION-{roomId?.slice(0, 4).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                      CLASSIFIED
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center" style={{ height: '400px' }}>
+                    <div style={{ borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <IconForWord word={codeWord} size={320} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
+                    <svg width="180" height="40">
+                      {Array.from({ length: 60 }).map((_, i) => (
+                        <rect
+                          key={i}
+                          x={i * 3}
+                          y={0}
+                          width={Math.random() > 0.5 ? 2 : 1}
+                          height={40}
+                          fill="#FDD804"
+                        />
+                      ))}
+                    </svg>
+                  </div>
                 </div>
               )}
             </div>
@@ -1077,7 +1446,7 @@ const fetchPlayerScores = async (): Promise<void> => {
           <div className="text-center py-12">
             <AlertCircle
               className="mx-auto mb-4"
-              style={{ width: '48px', height: '48px', color: '#DC2626' }}
+              style={{ width: '48px', height: '48px', color: '#666666' }}
             />
             <p
               style={{
@@ -1106,36 +1475,68 @@ const fetchPlayerScores = async (): Promise<void> => {
         {/* Spy Code Words Grid */}
         {(isSpy || codeWord === 'spy') && agentId && (
           <div className="mt-8">
-            <p
-              className="mb-4 text-center"
+            <div
+              className="p-6"
               style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#666666',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                backgroundColor: '#000000',
+                border: 'none',
+                borderRadius: '12px',
               }}
             >
-              Possible Code Signs
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {spyCodeWords.map((word) => (
-                <div
-                  key={word}
-                  className="p-2 flex items-center justify-center"
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '3px solid #E5E7EB',
-                    borderRadius: '16px',
-                    aspectRatio: '1/1',
-                  }}
-                >
-                  <IconForWord word={word} size={200} />
-                </div>
-              ))}
+              <div className="flex justify-between items-center mb-4">
+                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                  ALERT-{Math.floor(Math.random() * 9000 + 1000)}
+                </span>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                  PRIORITY-1
+                </span>
+              </div>
+              <p
+                className="text-center mb-6"
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 900,
+                  color: '#FDD804',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                SPY
+              </p>
+              <p
+                className="mb-4 text-center"
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: '#FDD804',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                Possible Code Signs
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {spyCodeWords.map((word) => (
+                  <div
+                    key={word}
+                    className="p-4 flex items-center justify-center"
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      aspectRatio: '1/1',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ borderRadius: '8px', overflow: 'hidden' }}>
+                      <IconForWord word={word} size={120} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
+      )}
 
       {/* Player Scores Modal */}
       {showScores && (
@@ -1209,6 +1610,31 @@ const fetchPlayerScores = async (): Promise<void> => {
     </div>
   </div>
 )}
+
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        @keyframes fadeOut {
+          0% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { opacity: 0; visibility: hidden; }
+        }
+        @keyframes scaleIn {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeOutLine {
+          0% { opacity: 1; }
+          60% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

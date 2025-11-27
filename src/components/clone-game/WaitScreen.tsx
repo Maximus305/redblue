@@ -189,7 +189,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             }}
           >
-            {isMeSpeaker ? "You're about to speak." : `${speaker.name} is now speaking.`}
+            {isMeSpeaker ? "You're about to speak." : `${speaker.name} is about to speak.`}
           </h1>
         </div>
       </div>
