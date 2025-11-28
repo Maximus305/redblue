@@ -123,7 +123,6 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const hasShownReveal = useRef(false);
   const isInitializing = useRef(true);
   const [votingStarted, setVotingStarted] = useState(false);
-  const [revealSpy, setRevealSpy] = useState(false);
   const [showDiscussionScreen, setShowDiscussionScreen] = useState(false);
   const [showRevealScreen, setShowRevealScreen] = useState(false);
   const [hostVotedCorrectly, setHostVotedCorrectly] = useState(false);
@@ -609,8 +608,6 @@ const fetchPlayerScores = async (): Promise<void> => {
 
         // Check for reveal spy trigger
         if (data.revealSpy === true && !showRevealScreen) {
-          setRevealSpy(true);
-
           // Get spy information and check if host voted correctly
           const agentsQuery = query(
             collection(db, "agents"),
@@ -635,7 +632,6 @@ const fetchPlayerScores = async (): Promise<void> => {
         // Check for new round
         if (data.newRoundStarted === true) {
           console.log('🔄 New round started - resetting all state');
-          setRevealSpy(false);
           setShowRevealScreen(false);
           setShowDiscussionScreen(false);
           setVotingStarted(false);
@@ -922,69 +918,6 @@ const fetchPlayerScores = async (): Promise<void> => {
               position: 'relative',
             }}
           >
-            {/* Room Code at top */}
-            <p
-              style={{
-                position: 'absolute',
-                top: '12px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: '16px',
-                fontWeight: 700,
-                color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                margin: 0,
-                letterSpacing: '1.5px',
-              }}
-            >
-              {roomId}
-            </p>
-
-            {/* Left side metadata (centered vertically) */}
-            <span style={{
-              position: 'absolute',
-              top: '50%',
-              left: '12px',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: '#666666',
-              fontFamily: 'monospace',
-              transform: 'translateY(-50%) rotate(90deg)',
-            }}>
-              CLR-{Math.floor(Math.random() * 9000 + 1000)}
-            </span>
-
-            {/* Right side metadata (centered vertically) */}
-            <span style={{
-              position: 'absolute',
-              top: '50%',
-              right: '12px',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: '#666666',
-              fontFamily: 'monospace',
-              transform: 'translateY(-50%) rotate(-90deg)',
-            }}>
-              CLASSIFIED
-            </span>
-
-            {/* Bottom text (normal) */}
-            <p
-              style={{
-                position: 'absolute',
-                bottom: '12px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: '18px',
-                fontWeight: 700,
-                color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                margin: 0,
-              }}
-            >
-              Scan to join
-            </p>
-
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
               size={180}
