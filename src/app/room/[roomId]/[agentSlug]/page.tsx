@@ -1,7 +1,6 @@
 "use client"
 import React, { useState, useEffect, use, useMemo, useRef } from "react";
 import { Loader2, Crown, AlertCircle, X } from 'lucide-react';
-import { Check } from '@phosphor-icons/react/dist/ssr';
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -36,6 +35,9 @@ interface SettingsData {
   spyAgents?: string[];
   gameStarted?: boolean;
   votingStarted?: boolean;
+  revealSpy?: boolean;
+  newRoundStarted?: boolean;
+  hostVotedFor?: string;
 }
 
 interface RoomInfo {
@@ -119,14 +121,12 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [, setRevealRole] = useState<'agent' | 'spy' | null>(null);
   const [allAgents, setAllAgents] = useState<Array<{id: string, name: string}>>([]);
   const hasShownReveal = useRef(false);
+  const isInitializing = useRef(true);
   const [votingStarted, setVotingStarted] = useState(false);
-  const [, setHasVoted] = useState(false);
-  const [selectedVote, setSelectedVote] = useState<string | null>(null);
-  const [allVotes, setAllVotes] = useState<Record<string, string>>({});
-  const [votingComplete, setVotingComplete] = useState(false);
-  const [votingResults, setVotingResults] = useState<{ spyId: string; spyName: string; wasCorrect: boolean } | null>(null);
-  const [showVotingScreen, setShowVotingScreen] = useState(false);
-  const [showWaitingScreen, setShowWaitingScreen] = useState(false);
+  const [revealSpy, setRevealSpy] = useState(false);
+  const [showDiscussionScreen, setShowDiscussionScreen] = useState(false);
+  const [showRevealScreen, setShowRevealScreen] = useState(false);
+  const [hostVotedCorrectly, setHostVotedCorrectly] = useState(false);
 
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket', 'Barrel',
@@ -139,11 +139,11 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
     'Rope', 'Rubiks', 'Tent', 'Tire', 'Wrench'
   ];
 
-  // Generate 6 random words including the common code word for spy view
+  // Generate 20 random words including the common code word for spy view
   // Use roomId as seed to keep consistent across reloads
   const spyCodeWords = useMemo(() => {
     if (!commonCodeWord || commonCodeWord === 'spy') {
-      // Fallback: return 6 random words if no common code word
+      // Fallback: return 20 random words if no common code word
       // Use roomId to seed the selection
       const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
       const shuffled = [...allCodeWords].sort((a, b) => {
@@ -151,10 +151,10 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
         const hashB = (b.charCodeAt(0) + seed) % allCodeWords.length;
         return hashA - hashB;
       });
-      return shuffled.slice(0, 6);
+      return shuffled.slice(0, 20);
     }
 
-    // Get 5 random words excluding the common code word
+    // Get 19 random words excluding the common code word
     const otherWords = allCodeWords.filter(w => w !== commonCodeWord);
     const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
     const shuffled = otherWords.sort((a, b) => {
@@ -162,12 +162,12 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
       const hashB = (b.charCodeAt(0) + seed) % otherWords.length;
       return hashA - hashB;
     });
-    const randomFive = shuffled.slice(0, 5);
+    const randomNineteen = shuffled.slice(0, 19);
 
     // Combine with common code word and shuffle again
-    const result = [...randomFive, commonCodeWord].sort((a, b) => {
-      const hashA = (a.charCodeAt(0) + seed) % 6;
-      const hashB = (b.charCodeAt(0) + seed) % 6;
+    const result = [...randomNineteen, commonCodeWord].sort((a, b) => {
+      const hashA = (a.charCodeAt(0) + seed) % 20;
+      const hashB = (b.charCodeAt(0) + seed) % 20;
       return hashA - hashB;
     });
     return result;
@@ -520,6 +520,11 @@ const fetchPlayerScores = async (): Promise<void> => {
 
       setTimeout(() => setShowContent(true), 100);
 
+      // Mark initialization as complete after a short delay
+      setTimeout(() => {
+        isInitializing.current = false;
+      }, 1000);
+
       return () => {
         unsubscribeSettings();
         unsubscribeAgent();
@@ -532,12 +537,15 @@ const fetchPlayerScores = async (): Promise<void> => {
 
   // Save agent name to both local storage and Firestore whenever it changes
   useEffect(() => {
+    // Skip if we're still initializing to prevent duplicate writes
+    if (isInitializing.current) return;
+
     if (agentName && agentId) {
       // Update the room-specific storage key
       localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, agentName);
       // Also update the generic key for backward compatibility
       localStorage.setItem('agentName', agentName);
-      
+
       // Update Firestore if we have an agent ID
       const agentKey = `${roomId}_${agentSlug}`;
       const agentRef = doc(db, "agents", agentKey);
@@ -583,116 +591,78 @@ const fetchPlayerScores = async (): Promise<void> => {
     }
   }, [gameStarted, isSpy, codeWord]);
 
-  // Navigate to voting screen when votingStarted becomes true
+  // Navigate to discussion screen when votingStarted becomes true
   useEffect(() => {
     if (votingStarted && gameStarted) {
-      setShowVotingScreen(true);
-      setShowWaitingScreen(false);
+      setShowDiscussionScreen(true);
     }
   }, [votingStarted, gameStarted]);
 
-  // Listen for votes and determine when voting is complete
+  // Listen for revealSpy flag and determine if host voted correctly
   useEffect(() => {
-    if (!votingStarted || !roomId) return;
+    if (!roomId) return;
 
-    const votesRef = collection(db, 'votes', roomId, 'players');
-    const unsubscribe = onSnapshot(votesRef, async (snapshot) => {
-      const votes: Record<string, string> = {};
-      snapshot.docs.forEach(doc => {
-        votes[doc.id] = doc.data().votedFor;
-      });
-      setAllVotes(votes);
+    const settingsRef = doc(db, "settings", roomId);
+    const unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
 
-      // Check if all players have voted
-      const totalPlayers = allAgents.length;
-      const totalVotes = snapshot.docs.length;
+        // Check for reveal spy trigger
+        if (data.revealSpy === true && !showRevealScreen) {
+          setRevealSpy(true);
 
-      if (totalVotes === totalPlayers && totalPlayers > 0) {
-        // Voting is complete, calculate results
-        setVotingComplete(true);
+          // Get spy information and check if host voted correctly
+          const agentsQuery = query(
+            collection(db, "agents"),
+            where("roomId", "==", roomId)
+          );
 
-        // Count votes
-        const voteCounts: Record<string, number> = {};
-        snapshot.docs.forEach(doc => {
-          const votedFor = doc.data().votedFor;
-          voteCounts[votedFor] = (voteCounts[votedFor] || 0) + 1;
-        });
+          const agentsSnap = await getDocs(agentsQuery);
+          const spyAgent = agentsSnap.docs.find(doc => doc.data().isSpy);
+          const spyId = spyAgent?.id;
 
-        // Find player with most votes
-        let maxVotes = 0;
-        let suspectedSpyId = '';
-        Object.entries(voteCounts).forEach(([playerId, count]) => {
-          if (count > maxVotes) {
-            maxVotes = count;
-            suspectedSpyId = playerId;
+          // Get host's vote from settings
+          const hostVotedForId = data.hostVotedFor;
+
+          // Check if host voted correctly (compare IDs)
+          const votedCorrectly = hostVotedForId === spyId;
+          setHostVotedCorrectly(votedCorrectly);
+
+          setShowRevealScreen(true);
+          setShowDiscussionScreen(false);
+        }
+
+        // Check for new round
+        if (data.newRoundStarted === true) {
+          console.log('🔄 New round started - resetting all state');
+          setRevealSpy(false);
+          setShowRevealScreen(false);
+          setShowDiscussionScreen(false);
+          setVotingStarted(false);
+          setHostVotedCorrectly(false);
+
+          // Force refresh of spy status and code word from Firebase
+          // This ensures we don't show stale spy UI
+          const agentKey = `${roomId}_${agentSlug}`;
+          const agentRef = doc(db, "agents", agentKey);
+          const agentSnap = await getDoc(agentRef);
+
+          if (agentSnap.exists()) {
+            const agentData = agentSnap.data();
+            setIsSpy(Boolean(agentData.isSpy));
+            setCodeWord(agentData.codeWord);
+            console.log('🔄 Refreshed agent data:', {
+              isSpy: agentData.isSpy,
+              codeWord: agentData.codeWord
+            });
           }
-        });
-
-        // Get the actual spy ID from settings
-        const settingsRef = doc(db, "settings", roomId);
-        const settingsDoc = await getDoc(settingsRef);
-        if (settingsDoc.exists()) {
-          const settings = settingsDoc.data() as SettingsData;
-          console.log('🕵️ SPY DETECTION:', {
-            spyAgent: settings.spyAgent,
-            allAgents: allAgents,
-            roomId
-          });
-          const actualSpySlug = settings.spyAgent?.includes('_')
-            ? settings.spyAgent.split('_')[1]
-            : settings.spyAgent;
-          const actualSpyId = `${roomId}_${actualSpySlug}`;
-          console.log('🎯 SPY ID CALCULATED:', {
-            actualSpySlug,
-            actualSpyId,
-            suspectedSpyId
-          });
-
-          // Get spy name - try to find in allAgents first, otherwise use the slug
-          let spyName = allAgents.find(a => a.id === actualSpyId)?.name || '';
-
-          // If not found in allAgents (e.g., host), try to get from agents collection
-          if (!spyName) {
-            const spyAgentRef = doc(db, "agents", actualSpyId);
-            const spyAgentDoc = await getDoc(spyAgentRef);
-            if (spyAgentDoc.exists()) {
-              spyName = spyAgentDoc.data().agentName || actualSpySlug || 'Unknown';
-            } else {
-              spyName = actualSpySlug || 'Unknown'; // Fallback to slug
-            }
-          }
-
-          // Check if the vote was correct
-          const wasCorrect = suspectedSpyId === actualSpyId;
-          setVotingResults({ spyId: actualSpyId, spyName, wasCorrect });
         }
       }
     });
 
     return () => unsubscribe();
-  }, [votingStarted, roomId, allAgents.length]);
+  }, [roomId, showRevealScreen]);
 
-  // Listen for new round starting (votes being cleared)
-  useEffect(() => {
-    if (!votingComplete || !roomId) return;
-
-    const votesRef = collection(db, 'votes', roomId, 'players');
-    const unsubscribe = onSnapshot(votesRef, (snapshot) => {
-      // If we're on results screen and votes collection becomes empty, new round started
-      if (snapshot.docs.length === 0 && votingComplete) {
-        console.log('🔄 New round detected - votes cleared');
-        // Reset all voting state
-        setVotingComplete(false);
-        setVotingResults(null);
-        setShowVotingScreen(false);
-        setShowWaitingScreen(false);
-        setSelectedVote(null);
-        setAllVotes({});
-      }
-    });
-
-    return () => unsubscribe();
-  }, [votingComplete, roomId]);
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
     const agentKey = `${roomId}_${agentSlug}`;
@@ -924,9 +894,9 @@ const fetchPlayerScores = async (): Promise<void> => {
         <div className="w-full max-w-md">
           {/* Title */}
           <h1
-            className="text-center mb-12"
+            className="text-center mb-8"
             style={{
-              fontSize: '56px',
+              fontSize: '42px',
               fontWeight: 400,
               color: '#000000',
               fontFamily: 'var(--font-barrio)',
@@ -938,12 +908,13 @@ const fetchPlayerScores = async (): Promise<void> => {
 
           {/* QR Code */}
           <div
-            className="mb-8 p-6 mx-auto"
+            className="mb-6 p-4 mx-auto"
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: '16px',
               border: '2px solid #E5E5E5',
-              width: '85%',
+              width: '80%',
+              maxWidth: '320px',
               aspectRatio: '1/1',
               display: 'flex',
               alignItems: 'center',
@@ -955,15 +926,15 @@ const fetchPlayerScores = async (): Promise<void> => {
             <p
               style={{
                 position: 'absolute',
-                top: '16px',
+                top: '12px',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                fontSize: '20px',
+                fontSize: '16px',
                 fontWeight: 700,
                 color: '#000000',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 margin: 0,
-                letterSpacing: '2px',
+                letterSpacing: '1.5px',
               }}
             >
               {roomId}
@@ -973,8 +944,8 @@ const fetchPlayerScores = async (): Promise<void> => {
             <span style={{
               position: 'absolute',
               top: '50%',
-              left: '16px',
-              fontSize: '10px',
+              left: '12px',
+              fontSize: '9px',
               fontWeight: 700,
               color: '#666666',
               fontFamily: 'monospace',
@@ -987,8 +958,8 @@ const fetchPlayerScores = async (): Promise<void> => {
             <span style={{
               position: 'absolute',
               top: '50%',
-              right: '16px',
-              fontSize: '10px',
+              right: '12px',
+              fontSize: '9px',
               fontWeight: 700,
               color: '#666666',
               fontFamily: 'monospace',
@@ -1001,10 +972,10 @@ const fetchPlayerScores = async (): Promise<void> => {
             <p
               style={{
                 position: 'absolute',
-                bottom: '16px',
+                bottom: '12px',
                 left: '50%',
                 transform: 'translateX(-50%)',
-                fontSize: '24px',
+                fontSize: '18px',
                 fontWeight: 700,
                 color: '#000000',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -1016,7 +987,7 @@ const fetchPlayerScores = async (): Promise<void> => {
 
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={240}
+              size={180}
               level="M"
             />
           </div>
@@ -1027,18 +998,19 @@ const fetchPlayerScores = async (): Promise<void> => {
             return (
               <div
                 key={agent.id}
-                className="p-3 mb-3 mx-auto"
+                className="p-2.5 mb-2.5 mx-auto"
                 style={{
                   backgroundColor: isMe ? '#FDD804' : '#FFFFFF',
                   border: isMe ? 'none' : '2px solid #E5E5E5',
                   borderRadius: '9999px',
-                  width: '70%',
+                  width: '65%',
+                  maxWidth: '280px',
                 }}
               >
                 <p
                   className="text-center"
                   style={{
-                    fontSize: '18px',
+                    fontSize: '16px',
                     fontWeight: 700,
                     color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -1077,7 +1049,7 @@ const fetchPlayerScores = async (): Promise<void> => {
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{
-        backgroundColor: '#FDD804',
+        backgroundColor: (showRevealScreen && isSpy) ? '#DC2626' : '#FDD804',
       }}
     >
       {/* Show the removed alert if the player has been removed */}
@@ -1087,169 +1059,109 @@ const fetchPlayerScores = async (): Promise<void> => {
         }} />
       )}
 
-      {/* Voting Screen */}
-      {votingComplete ? (
-            <div className="w-full max-w-md">
-              {votingResults && (
-                <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
-                  <h1
-                    className="text-center"
-                    style={{
-                      fontSize: '56px',
-                      fontWeight: 900,
-                      color: '#000000',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      lineHeight: 1.2,
-                      marginBottom: '48px',
-                    }}
-                  >
-                    The spy was
-                  </h1>
-                  <div className="w-full p-10" style={{
-                    backgroundColor: '#000000',
-                    borderRadius: '24px',
-                  }}>
-                    <p
-                      className="text-center"
-                      style={{
-                        fontSize: '52px',
-                        fontWeight: 900,
-                        color: '#FDD804',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      }}
-                    >
-                      {votingResults.spyName}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : showVotingScreen ? (
-        <div className="w-full max-w-md">
-          {/* Title with vote count */}
-          <h2
-            className="text-center"
-            style={{
-              fontSize: '48px',
-              fontWeight: 900,
-              color: '#000000',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              lineHeight: 1.2,
-              marginBottom: '40px',
-            }}
-          >
-            Who is the spy?
-          </h2>
+      {/* Reveal Screen */}
+      {showRevealScreen ? (
+        <div
+          className="w-full max-w-md flex flex-col items-center justify-center"
+          style={{
+            minHeight: '60vh',
+          }}
+        >
+          {isSpy ? (
+            // Spy sees "SPY" at top, "REVEAL YOURSELF" at bottom on red background
+            <div className="text-center w-full flex flex-col justify-between" style={{ minHeight: '60vh' }}>
+              {/* SPY at top - huge */}
+              <h1
+                style={{
+                  fontSize: '120px',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  letterSpacing: '12px',
+                  lineHeight: 1,
+                }}
+              >
+                SPY
+              </h1>
 
-          {/* Player Cards */}
-          <div className="space-y-4 mb-8">
-            {allAgents.filter(agent => agent.id !== `${roomId}_${agentSlug}`).map((agent) => {
-              const isSelected = selectedVote === agent.id;
-
-              return (
-                <button
-                  key={agent.id}
-                  onClick={() => setSelectedVote(agent.id)}
-                  className="w-full transition-all"
+              {/* REVEAL YOURSELF at bottom */}
+              <div>
+                <h2
+                  className="mb-4"
                   style={{
-                    backgroundColor: isSelected ? '#FDD804' : '#000000',
-                    border: isSelected ? '4px solid #000000' : 'none',
-                    borderRadius: '20px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '24px 28px',
+                    fontSize: '48px',
+                    fontWeight: 900,
+                    color: '#FFFFFF',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    letterSpacing: '4px',
+                    lineHeight: 1.1,
                   }}
                 >
-                  <span
+                  REVEAL YOURSELF
+                </h2>
+
+                {/* Points display - only show if spy got the point */}
+                {!hostVotedCorrectly && (
+                  <h3
                     style={{
-                      fontSize: '28px',
-                      fontWeight: 700,
-                      color: isSelected ? '#000000' : '#FDD804',
+                      fontSize: '24px',
+                      fontWeight: 900,
+                      color: '#FFFFFF',
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      letterSpacing: '2px',
                     }}
                   >
-                    {agent.name}
-                  </span>
-                  {isSelected && (
-                    <Check
-                      size={36}
-                      weight="bold"
-                      color="#000000"
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                    +1 POINT FOR SPY
+                  </h3>
+                )}
+              </div>
+            </div>
+          ) : (
+            // Non-spy sees message on yellow background
+            <div className="text-center w-full">
+              <p
+                className="mb-8"
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: '#000000',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  letterSpacing: '1px',
+                }}
+              >
+                THE SPY WILL NOW REVEAL HIMSELF
+              </p>
 
-          {/* Submit Button */}
-          <button
-            onClick={async () => {
-              console.log('🗳️ VOTE BUTTON CLICKED', { selectedVote, agentId, roomId });
-              if (selectedVote && agentId) {
-                try {
-                  const votePath = `votes/${roomId}/players/${agentId}`;
-                  console.log('📝 Writing vote to:', votePath, { votedFor: selectedVote });
-                  const voteRef = doc(db, 'votes', roomId, 'players', agentId);
-                  await setDoc(voteRef, {
-                    votedFor: selectedVote,
-                    timestamp: new Date(),
-                    submitted: true
-                  });
-                  console.log('✅ Vote submitted successfully');
-                  setHasVoted(true);
-                  setShowVotingScreen(false);
-                  setShowWaitingScreen(true);
-                } catch (err) {
-                  console.error('❌ Error submitting vote:', err);
-                }
-              } else {
-                console.warn('⚠️ Cannot submit vote:', { selectedVote, agentId, reason: !selectedVote ? 'No vote selected' : 'No agentId' });
-              }
-            }}
-            disabled={!selectedVote}
-            className="w-full transition-all"
-            style={{
-              backgroundColor: selectedVote ? '#000000' : '#666666',
-              color: '#FDD804',
-              border: 'none',
-              borderRadius: '24px',
-              fontSize: '26px',
-              fontWeight: 900,
-              cursor: selectedVote ? 'pointer' : 'not-allowed',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              padding: '22px 0',
-              opacity: selectedVote ? 1 : 0.6,
-            }}
-          >
-            Submit Vote
-          </button>
+              <h1
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 900,
+                  color: '#000000',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  letterSpacing: '4px',
+                }}
+              >
+                WAITING FOR NEW ROUND...
+              </h1>
+            </div>
+          )}
         </div>
-      ) : showWaitingScreen ? (
-        <div className="w-full max-w-md text-center">
-          <h1
-            className="mb-6"
-            style={{
-              fontSize: '48px',
-              fontWeight: 900,
-              color: '#000000',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            Waiting for votes...
-          </h1>
-          <p
-            style={{
-              fontSize: '24px',
-              fontWeight: 600,
-              color: '#666666',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            {Object.keys(allVotes).length} / {allAgents.length} voted
-          </p>
+      ) : showDiscussionScreen ? (
+        // Discussion Screen - Simple text based on spy status
+        <div className="w-full max-w-md flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="text-center">
+            <h1
+              style={{
+                fontSize: '64px',
+                fontWeight: 900,
+                color: '#000000',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                letterSpacing: '4px',
+              }}
+            >
+              {isSpy ? 'BLEND IN' : 'LISTEN TO HOST'}
+            </h1>
+          </div>
         </div>
       ) : (
       <div className={`w-full max-w-md transform transition-all duration-300 relative z-10 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
@@ -1354,7 +1266,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                   style={{
                     backgroundColor: '#000000',
                     border: 'none',
-                    borderRadius: '12px',
+                    borderRadius: '24px',
                   }}
                 >
                   <div className="flex justify-between items-center mb-2">
@@ -1403,15 +1315,15 @@ const fetchPlayerScores = async (): Promise<void> => {
 
               {!(isSpy || codeWord === 'spy') && (
                 <div
-                  className="p-8 mx-auto"
+                  className="p-6 mx-auto w-full max-w-md"
                   style={{
                     backgroundColor: '#000000',
                     border: 'none',
-                    borderRadius: '12px',
-                    width: '450px',
+                    borderRadius: '24px',
+                    overflow: 'hidden',
                   }}
                 >
-                  <div className="flex justify-between items-center mb-2">
+                  <div className="flex justify-between items-center mb-3">
                     <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
                       MISSION-{roomId?.slice(0, 4).toUpperCase()}
                     </span>
@@ -1419,13 +1331,13 @@ const fetchPlayerScores = async (): Promise<void> => {
                       CLASSIFIED
                     </span>
                   </div>
-                  <div className="flex items-center justify-center" style={{ height: '400px' }}>
-                    <div style={{ borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <IconForWord word={codeWord} size={320} />
+                  <div className="flex items-center justify-center" style={{ aspectRatio: '1/1', maxHeight: '350px', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden' }}>
+                      <IconForWord word={codeWord} size={280} />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
-                    <svg width="180" height="40">
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
+                    <svg width="100%" height="40" viewBox="0 0 180 40" preserveAspectRatio="xMidYMid meet">
                       {Array.from({ length: 60 }).map((_, i) => (
                         <rect
                           key={i}
@@ -1513,21 +1425,21 @@ const fetchPlayerScores = async (): Promise<void> => {
               >
                 Possible Code Signs
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 {spyCodeWords.map((word) => (
                   <div
                     key={word}
-                    className="p-4 flex items-center justify-center"
+                    className="p-2 flex items-center justify-center"
                     style={{
                       backgroundColor: '#FFFFFF',
                       border: 'none',
-                      borderRadius: '12px',
+                      borderRadius: '8px',
                       aspectRatio: '1/1',
                       overflow: 'hidden',
                     }}
                   >
-                    <div style={{ borderRadius: '8px', overflow: 'hidden' }}>
-                      <IconForWord word={word} size={120} />
+                    <div style={{ borderRadius: '6px', overflow: 'hidden' }}>
+                      <IconForWord word={word} size={60} />
                     </div>
                   </div>
                 ))}
