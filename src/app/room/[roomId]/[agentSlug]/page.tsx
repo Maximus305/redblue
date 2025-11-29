@@ -558,16 +558,43 @@ const fetchPlayerScores = async (): Promise<void> => {
     const agentsQuery = query(collection(db, "agents"), where("roomId", "==", roomId));
     const unsubscribe = onSnapshot(agentsQuery, (snapshot) => {
       setPlayerCount(snapshot.docs.length);
-      const agents = snapshot.docs.map(doc => {
+
+      // Track unique players by their base name to avoid duplicates
+      const seenNames = new Map<string, {id: string, name: string, timestamp: number}>();
+
+      snapshot.docs.forEach(doc => {
         const rawId = doc.id;
+        const data = doc.data();
+
         // Remove room code prefix (e.g., "CPQS-E9H4_james" -> "james")
         const cleanId = rawId.includes('_') ? rawId.split('_')[1] : rawId;
-        const name = doc.data().agentName || cleanId;
-        return {
-          id: rawId, // Keep full ID for key purposes
-          name: name
-        };
+        const name = data.agentName || cleanId;
+
+        // Extract base name (before the timestamp suffix if it exists)
+        // e.g., "james-1234567890" -> "james"
+        const baseName = cleanId.split('-')[0];
+
+        // Get timestamp from the cleanId or use 0
+        const timestampMatch = cleanId.match(/-(\d+)$/);
+        const timestamp = timestampMatch ? parseInt(timestampMatch[1]) : 0;
+
+        // Only keep the most recent entry for each base name
+        const existing = seenNames.get(baseName);
+        if (!existing || timestamp > existing.timestamp) {
+          seenNames.set(baseName, {
+            id: rawId,
+            name: name,
+            timestamp: timestamp
+          });
+        }
       });
+
+      // Convert map to array
+      const agents = Array.from(seenNames.values()).map(({id, name}) => ({
+        id,
+        name
+      }));
+
       setAllAgents(agents);
     });
 
