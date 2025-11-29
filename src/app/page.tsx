@@ -57,25 +57,23 @@ export default function PartykiteLanding() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-zinc-50 font-mono">
       {/* Header */}
-      <nav className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+      <nav className="bg-white border-b border-zinc-200">
+        <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
               <img
                 src="/partykitelogo.png"
-                alt="PartyKite Logo"
-                className="w-12 h-12"
+                alt="PartyKite"
+                className="w-10 h-10"
               />
-              <span className="text-3xl font-black" style={{ fontFamily: 'var(--font-barrio)' }}>
-                PARTYKITE
-              </span>
+              <span className="text-xl font-bold tracking-tight">PARTYKITE</span>
             </div>
 
             <button
               onClick={() => setShowEmailSignup(true)}
-              className="bg-black text-white px-8 py-4 rounded-full font-black text-lg hover:bg-yellow-400 hover:text-black transition-colors"
+              className="bg-blue-600 text-white px-6 py-2.5 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors"
             >
               JOIN WAITLIST
             </button>
@@ -84,61 +82,61 @@ export default function PartykiteLanding() {
       </nav>
 
       {/* Hero Section */}
-      <section className="bg-yellow-400 py-20 px-6">
-        <div className="max-w-6xl mx-auto text-center">
-          <h1 className="text-7xl md:text-9xl font-black mb-8" style={{ fontFamily: 'var(--font-barrio)', lineHeight: 0.9 }}>
-            PARTY
+      <section className="py-20 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight">
+            Interactive Party Games
             <br />
-            GAMES
-            <br />
-            EVOLVED
+            <span className="text-blue-600">For Real Connections</span>
           </h1>
 
-          <p className="text-2xl md:text-3xl font-bold mb-12 max-w-3xl mx-auto" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-            The platform that turns strangers into friends through interactive party games
+          <p className="text-xl text-zinc-600 mb-10 max-w-2xl mx-auto">
+            PartyKite is a platform that brings people together through interactive games.
+            No downloads. No accounts. Just scan and play.
           </p>
 
           <button
             onClick={() => setShowEmailSignup(true)}
-            className="bg-black text-white px-12 py-6 rounded-full font-black text-2xl hover:scale-105 transition-transform"
+            className="bg-blue-600 text-white px-8 py-4 rounded-md text-lg font-semibold hover:bg-blue-700 transition-colors inline-block"
           >
-            GET EARLY ACCESS
+            Get Early Access
           </button>
         </div>
       </section>
 
-      {/* What is PartyKite Section */}
-      <section className="bg-white py-24 px-6 border-b-2 border-black">
+      {/* Features */}
+      <section className="py-16 px-6 bg-white border-y border-zinc-200">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-6xl md:text-7xl font-black text-center mb-16" style={{ fontFamily: 'var(--font-barrio)' }}>
-            WHAT IS PARTYKITE?
-          </h2>
+          <h2 className="text-3xl font-bold text-center mb-12">What is PartyKite?</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 */}
-            <div className="bg-yellow-400 rounded-3xl p-8 border-2 border-black">
-              <div className="text-6xl mb-6">🎮</div>
-              <h3 className="text-3xl font-black mb-4">INSTANT PLAY</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                Scan a code. Start playing. No downloads, no accounts, no BS.
+            <div className="text-center p-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📱</span>
+              </div>
+              <h3 className="text-lg font-bold mb-2">Instant Play</h3>
+              <p className="text-zinc-600 text-sm">
+                Scan a QR code and start playing. No apps to download or accounts to create.
               </p>
             </div>
 
-            {/* Feature 2 */}
-            <div className="bg-black text-white rounded-3xl p-8 border-2 border-black">
-              <div className="text-6xl mb-6">👥</div>
-              <h3 className="text-3xl font-black mb-4 text-yellow-400">REAL CONNECTIONS</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                Games designed to break the ice and create genuine moments.
+            <div className="text-center p-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">👥</span>
+              </div>
+              <h3 className="text-lg font-bold mb-2">Real Connections</h3>
+              <p className="text-zinc-600 text-sm">
+                Games designed to break the ice and create genuine moments between people.
               </p>
             </div>
 
-            {/* Feature 3 */}
-            <div className="bg-yellow-400 rounded-3xl p-8 border-2 border-black">
-              <div className="text-6xl mb-6">⚡</div>
-              <h3 className="text-3xl font-black mb-4">ALWAYS FRESH</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                New games every week. Never run out of ways to have fun.
+            <div className="text-center p-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🎮</span>
+              </div>
+              <h3 className="text-lg font-bold mb-2">Always Fresh</h3>
+              <p className="text-zinc-600 text-sm">
+                New games added regularly. From classic party games to unique experiences.
               </p>
             </div>
           </div>
@@ -146,148 +144,147 @@ export default function PartykiteLanding() {
       </section>
 
       {/* How It Works */}
-      <section className="bg-yellow-400 py-24 px-6 border-b-2 border-black">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-6xl md:text-7xl font-black text-center mb-20" style={{ fontFamily: 'var(--font-barrio)' }}>
-            HOW IT WORKS
-          </h2>
+      <section className="py-16 px-6">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="text-center">
-              <div className="w-32 h-32 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-6xl font-black text-yellow-400">1</span>
+          <div className="space-y-8">
+            <div className="flex gap-6 items-start">
+              <div className="w-12 h-12 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold flex-shrink-0">
+                1
               </div>
-              <h3 className="text-3xl font-black mb-4">PICK A GAME</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                Choose from dozens of party games
-              </p>
+              <div>
+                <h3 className="text-xl font-bold mb-2">Create a Room</h3>
+                <p className="text-zinc-600">
+                  Pick your game and get an instant room code. Share it with your group.
+                </p>
+              </div>
             </div>
 
-            <div className="text-center">
-              <div className="w-32 h-32 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-6xl font-black text-yellow-400">2</span>
+            <div className="flex gap-6 items-start">
+              <div className="w-12 h-12 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold flex-shrink-0">
+                2
               </div>
-              <h3 className="text-3xl font-black mb-4">SHARE THE CODE</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                Everyone scans the QR code to join
-              </p>
+              <div>
+                <h3 className="text-xl font-bold mb-2">Everyone Joins</h3>
+                <p className="text-zinc-600">
+                  Players scan the QR code or enter the room code on their phones. No app needed.
+                </p>
+              </div>
             </div>
 
-            <div className="text-center">
-              <div className="w-32 h-32 bg-black rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-6xl font-black text-yellow-400">3</span>
+            <div className="flex gap-6 items-start">
+              <div className="w-12 h-12 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold flex-shrink-0">
+                3
               </div>
-              <h3 className="text-3xl font-black mb-4">PLAY & LAUGH</h3>
-              <p className="text-xl font-semibold leading-relaxed">
-                Watch the magic happen
-              </p>
+              <div>
+                <h3 className="text-xl font-bold mb-2">Play & Connect</h3>
+                <p className="text-zinc-600">
+                  Start playing immediately. Watch strangers become friends.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="bg-white py-24 px-6 border-b-2 border-black">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-7xl font-black mb-4">10K+</div>
-              <div className="text-xl font-bold">ON WAITLIST</div>
+      {/* Stats */}
+      <section className="py-16 px-6 bg-white border-y border-zinc-200">
+        <div className="max-w-4xl mx-auto">
+          <div className="grid grid-cols-3 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">10K+</div>
+              <div className="text-sm text-zinc-600 uppercase tracking-wide">On Waitlist</div>
             </div>
-            <div className="text-center">
-              <div className="text-7xl font-black mb-4">50+</div>
-              <div className="text-xl font-bold">GAMES</div>
+            <div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">50+</div>
+              <div className="text-sm text-zinc-600 uppercase tracking-wide">Games</div>
             </div>
-            <div className="text-center">
-              <div className="text-7xl font-black mb-4">100%</div>
-              <div className="text-xl font-bold">FUN</div>
+            <div>
+              <div className="text-4xl font-bold text-blue-600 mb-2">100%</div>
+              <div className="text-sm text-zinc-600 uppercase tracking-wide">Fun</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="bg-black text-white py-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-6xl md:text-7xl font-black mb-8 text-yellow-400" style={{ fontFamily: 'var(--font-barrio)' }}>
-            READY TO PARTY?
-          </h2>
-
-          <p className="text-2xl font-bold mb-12 leading-relaxed">
-            Join thousands on the waitlist. Get free lifetime access when we launch.
+      {/* CTA */}
+      <section className="py-20 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to Join?</h2>
+          <p className="text-xl text-zinc-600 mb-8">
+            Get free lifetime access when we launch. Join thousands already on the waitlist.
           </p>
 
-          <div className="bg-yellow-400 text-black rounded-3xl p-8 mb-12 border-2 border-yellow-400">
-            <div className="text-3xl font-black mb-2">🎉 LAUNCH SPECIAL</div>
-            <div className="text-xl font-bold">Free lifetime access for early supporters</div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div className="font-bold text-blue-900 mb-1">🎉 Launch Special</div>
+            <div className="text-sm text-blue-700">Free lifetime access for early supporters</div>
           </div>
 
           <button
             onClick={() => setShowEmailSignup(true)}
-            className="bg-yellow-400 text-black px-12 py-6 rounded-full font-black text-2xl hover:scale-105 transition-transform"
+            className="bg-blue-600 text-white px-8 py-4 rounded-md text-lg font-semibold hover:bg-blue-700 transition-colors"
           >
-            JOIN THE WAITLIST
+            Join the Waitlist
           </button>
 
-          <p className="text-sm font-semibold mt-8 text-gray-400">
-            No spam. No credit card. Just party games.
+          <p className="text-xs text-zinc-500 mt-6">
+            No spam. No credit card required.
           </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t-2 border-black py-12 px-6">
+      <footer className="bg-white border-t border-zinc-200 py-8 px-6">
         <div className="max-w-6xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
+          <div className="flex items-center justify-center space-x-2 mb-3">
             <img
               src="/partykitelogo.png"
-              alt="PartyKite Logo"
-              className="w-10 h-10"
+              alt="PartyKite"
+              className="w-8 h-8"
             />
-            <span className="text-2xl font-black" style={{ fontFamily: 'var(--font-barrio)' }}>
-              PARTYKITE
-            </span>
+            <span className="text-sm font-bold">PARTYKITE</span>
           </div>
-          <p className="text-sm font-semibold text-gray-600">
+          <p className="text-xs text-zinc-500">
             © 2025 PartyKite. Making every gathering unforgettable.
           </p>
         </div>
       </footer>
 
-      {/* Email Signup Modal */}
+      {/* Email Modal */}
       {showEmailSignup && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative border-4 border-black">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8 relative">
             <button
               onClick={handleModalClose}
-              className="absolute top-6 right-6 text-black hover:text-gray-600 text-3xl font-black"
+              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 text-2xl font-light"
             >
               ×
             </button>
 
             {submitStatus === 'success' ? (
               <div className="text-center">
-                <div className="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl border-4 border-black">
-                  🎊
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">✓</span>
                 </div>
-                <h4 className="text-4xl font-black mb-4">YOU&apos;RE IN!</h4>
-                <p className="text-xl font-semibold mb-8 leading-relaxed">
-                  Welcome to PartyKite. We&apos;ll send you early access when we launch.
+                <h4 className="text-2xl font-bold mb-3">You&apos;re In!</h4>
+                <p className="text-zinc-600 mb-6">
+                  We&apos;ll send you early access when we launch.
                 </p>
                 <button
                   onClick={handleModalClose}
-                  className="bg-black text-white px-8 py-4 rounded-full font-black hover:bg-yellow-400 hover:text-black transition-colors"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-blue-700 transition-colors"
                 >
-                  LET&apos;S GO! 🚀
+                  Done
                 </button>
               </div>
             ) : (
               <div className="text-center">
-                <div className="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl border-4 border-black">
-                  🎉
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">📧</span>
                 </div>
-                <h3 className="text-4xl font-black mb-3">JOIN WAITLIST</h3>
-                <p className="text-lg font-semibold mb-8 leading-relaxed">
+                <h3 className="text-2xl font-bold mb-2">Join Waitlist</h3>
+                <p className="text-zinc-600 mb-6 text-sm">
                   Be first to experience the future of party games
                 </p>
 
@@ -298,35 +295,33 @@ export default function PartykiteLanding() {
                     onChange={handleEmailChange}
                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleEmailSubmit(e)}
                     placeholder="your@email.com"
-                    className="w-full px-6 py-4 border-4 border-black rounded-2xl text-black font-semibold text-lg mb-6 focus:outline-none focus:border-yellow-400"
+                    className="w-full px-4 py-3 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
                   />
 
                   {submitStatus === 'error' && (
-                    <div className="mb-6 p-4 bg-red-100 border-4 border-red-600 rounded-2xl flex items-center gap-3">
-                      <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-                      <p className="text-red-600 font-bold">Oops! Please try again.</p>
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2 text-sm">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                      <p className="text-red-700">Something went wrong. Please try again.</p>
                     </div>
                   )}
 
                   <button
                     onClick={handleEmailSubmit}
                     disabled={isSubmitting || !email.trim()}
-                    className="w-full bg-black text-white px-6 py-4 rounded-full font-black text-lg hover:bg-yellow-400 hover:text-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-3"
+                    className="w-full bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
                       <>
-                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        JOINING...
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Joining...
                       </>
                     ) : (
-                      <>
-                        GET EARLY ACCESS
-                      </>
+                      'Get Early Access'
                     )}
                   </button>
                 </div>
 
-                <p className="text-sm font-semibold text-gray-600 leading-relaxed">
+                <p className="text-xs text-zinc-500">
                   🔒 Unsubscribe anytime. No spam.
                 </p>
               </div>
