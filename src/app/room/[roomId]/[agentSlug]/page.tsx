@@ -1066,7 +1066,7 @@ const fetchPlayerScores = async (): Promise<void> => {
               fontSize: '42px',
               fontWeight: 900,
               color: '#000000',
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-barrio)',
               lineHeight: 1.1,
             }}
           >
@@ -1167,7 +1167,7 @@ const fetchPlayerScores = async (): Promise<void> => {
               fontSize: '42px',
               fontWeight: 900,
               color: '#000000',
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-barrio)',
               lineHeight: 1.1,
             }}
           >
