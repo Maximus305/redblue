@@ -1064,7 +1064,7 @@ const fetchPlayerScores = async (): Promise<void> => {
             className="mb-6"
             style={{
               fontSize: '42px',
-              fontWeight: 900,
+              fontWeight: 400,
               color: '#000000',
               fontFamily: 'var(--font-barrio)',
               lineHeight: 1.1,
@@ -1165,7 +1165,7 @@ const fetchPlayerScores = async (): Promise<void> => {
             className="text-center mb-8"
             style={{
               fontSize: '42px',
-              fontWeight: 900,
+              fontWeight: 400,
               color: '#000000',
               fontFamily: 'var(--font-barrio)',
               lineHeight: 1.1,
