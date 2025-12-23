@@ -1191,8 +1191,9 @@ const fetchPlayerScores = async (): Promise<void> => {
           >
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={150}
+              size={200}
               level="M"
+              style={{ width: '100%', height: '100%' }}
             />
           </div>
 
