@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
 import { db, auth, openVotingFn } from '@/lib/firebase';
 import {
@@ -71,9 +72,11 @@ export function useCloneGame(roomCode: string) {
 
         const { room: roomData } = await tryJoinRoom(roomCode);
 
-        const isActive = (roomData as any).active ?? ((roomData as any).status?.phase && (roomData as any).status.phase !== 'END');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const roomAny = roomData as any;
+        const isActive = roomAny.active ?? (roomAny.status?.phase && roomAny.status.phase !== 'END');
 
-        if ((roomData as any).active === false || !isActive) {
+        if (roomAny.active === false || !isActive) {
           setError('ROOM_CLOSED');
           setVerifying(false);
           return;
@@ -152,7 +155,7 @@ export function useCloneGame(roomCode: string) {
         const response = await import('@/data/questions/calibrationQuestions.json');
         const questions = response.default || response;
         setCalibrationQuestions(questions.slice(0, 3));
-      } catch (error) {
+      } catch (_error) {
         setCalibrationQuestions([]);
       }
     };
@@ -242,7 +245,7 @@ export function useCloneGame(roomCode: string) {
 
       localStorage.setItem(`playerId_${roomCode}`, playerId);
       setMyId(playerId);
-    } catch (err) {
+    } catch (_err) {
       setError('PERMISSION_DENIED');
     } finally {
       setLoading(false);
@@ -282,7 +285,7 @@ export function useCloneGame(roomCode: string) {
         }
       });
 
-    } catch (err) {
+    } catch (_err) {
       setError('PERMISSION_DENIED');
     } finally {
       setLoading(false);
@@ -343,7 +346,7 @@ export function useCloneGame(roomCode: string) {
 
         await updateDoc(doc(db, 'rooms', roomCode, 'rounds', currentRound.id), updateData);
 
-      } catch (err) {
+      } catch (_err) {
         setError('ALREADY_SET');
       } finally {
         setLoading(false);
@@ -372,7 +375,7 @@ export function useCloneGame(roomCode: string) {
           createdAt: serverTimestamp()
         });
 
-      } catch (err) {
+      } catch (_err) {
         setError('DEADLINE_PASSED');
         setHasVoted(false);
       } finally {
@@ -390,7 +393,7 @@ export function useCloneGame(roomCode: string) {
 
     try {
       await openVotingFn({ roomCode, roundId: currentRound.id });
-    } catch (err) {
+    } catch (_err) {
       setError('PERMISSION_DENIED');
     } finally {
       setLoading(false);

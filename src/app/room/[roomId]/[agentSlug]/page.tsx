@@ -1064,9 +1064,9 @@ const fetchPlayerScores = async (): Promise<void> => {
             className="mb-6"
             style={{
               fontSize: '42px',
-              fontWeight: 400,
+              fontWeight: 900,
               color: '#000000',
-              fontFamily: 'var(--font-barrio)',
+              fontFamily: 'monospace',
               lineHeight: 1.1,
             }}
           >
@@ -1165,9 +1165,9 @@ const fetchPlayerScores = async (): Promise<void> => {
             className="text-center mb-8"
             style={{
               fontSize: '42px',
-              fontWeight: 400,
+              fontWeight: 900,
               color: '#000000',
-              fontFamily: 'var(--font-barrio)',
+              fontFamily: 'monospace',
               lineHeight: 1.1,
             }}
           >
@@ -1181,18 +1181,16 @@ const fetchPlayerScores = async (): Promise<void> => {
               backgroundColor: '#FFFFFF',
               borderRadius: '16px',
               border: '2px solid #E5E5E5',
-              width: '80%',
-              maxWidth: '320px',
-              aspectRatio: '1/1',
+              width: '65%',
+              maxWidth: '280px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              position: 'relative',
             }}
           >
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={180}
+              size={150}
               level="M"
             />
           </div>
@@ -1205,7 +1203,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 key={agent.id}
                 className="p-2.5 mb-2.5 mx-auto"
                 style={{
-                  backgroundColor: isMe ? '#000000' : '#FFFFFF',
+                  backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
                   border: isMe ? 'none' : '2px solid #E5E5E5',
                   borderRadius: '9999px',
                   width: '65%',
@@ -1217,7 +1215,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                   style={{
                     fontSize: '16px',
                     fontWeight: 700,
-                    color: isMe ? '#FFFFFF' : '#000000',
+                    color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >

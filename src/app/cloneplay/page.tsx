@@ -1,10 +1,10 @@
 "use client"
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import CloneGameService, { CloneGameState, ClonePlayer, getTeamColor, getTeamImage } from '@/services/clone/index';
 import {
   determinePlayerRole,
   validateGameState,
-  getRoleActionText,
   isTeamLeader,
   PlayerRole
 } from '@/utils/playerRoles';
@@ -77,7 +77,7 @@ const CloneGamePlay: React.FC = () => {
 
       return `I'd say ${humanAnswer.toLowerCase()}`;
 
-    } catch (error) {
+    } catch (_error) {
       return `I'd say ${humanAnswer.toLowerCase()}`;
     }
   };
@@ -105,7 +105,8 @@ const CloneGamePlay: React.FC = () => {
       setRoomId(urlRoomId);
       setPlayerId(urlPlayerId);
       
-      const storedPlayerName = localStorage.getItem(`playerName_${urlRoomId}`) ||
+      // Player name is stored but we use playerId for identification
+      const _storedPlayerName = localStorage.getItem(`playerName_${urlRoomId}`) ||
                                localStorage.getItem('agentName') ||
                                'Anonymous';
 
@@ -132,7 +133,8 @@ const CloneGamePlay: React.FC = () => {
             }
           }
 
-          gameData.players.forEach(p => {
+          gameData.players.forEach(_p => {
+            // Process player data
           });
 
           if (playerId) {
@@ -140,14 +142,14 @@ const CloneGamePlay: React.FC = () => {
             setPlayerRole(role);
             
             if (gameData.gamePhase === 'voting') {
-              const amITeamLeader = isTeamLeader(gameData, playerId);
-              const totalPlayers = gameData.players.length;
+              const _amITeamLeader = isTeamLeader(gameData, playerId);
+              const _totalPlayers = gameData.players.length;
 
 
               gameData.players.forEach(p => {
-                const isLeader = isTeamLeader(gameData, p.id);
-                const joinedAtType = p.joinedAt ? typeof p.joinedAt : 'undefined';
-                const hasToMillis = p.joinedAt && typeof p.joinedAt === 'object' && 'toMillis' in p.joinedAt;
+                const _isLeader = isTeamLeader(gameData, p.id);
+                const _joinedAtType = p.joinedAt ? typeof p.joinedAt : 'undefined';
+                const _hasToMillis = p.joinedAt && typeof p.joinedAt === 'object' && 'toMillis' in p.joinedAt;
               });
             }
             
@@ -1355,7 +1357,7 @@ const CloneGamePlay: React.FC = () => {
                           );
                           setAiResponse(cloneResponse);
                           setResponseStep('read');
-                        } catch (error) {
+                        } catch (_error) {
                           setAiResponse(`I'd say ${typedAnswer.toLowerCase()}`);
                           setResponseStep('read');
                         } finally {

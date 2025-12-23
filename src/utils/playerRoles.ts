@@ -31,12 +31,14 @@ export function isTeamLeader(gameState: CloneGameState, playerId: string): boole
     .filter(p => p.joinedAt) // Only players with join time
     .sort((a, b) => {
       // Handle Firebase Timestamp objects
-      const aTime = a.joinedAt && typeof a.joinedAt === 'object' && 'toMillis' in a.joinedAt
-        ? a.joinedAt.toMillis()
-        : new Date(a.joinedAt!).getTime();
-      const bTime = b.joinedAt && typeof b.joinedAt === 'object' && 'toMillis' in b.joinedAt
-        ? b.joinedAt.toMillis()
-        : new Date(b.joinedAt!).getTime();
+      const aJoinedAt = a.joinedAt as { toMillis?: () => number } | Date | string | number;
+      const bJoinedAt = b.joinedAt as { toMillis?: () => number } | Date | string | number;
+      const aTime = aJoinedAt && typeof aJoinedAt === 'object' && 'toMillis' in aJoinedAt && aJoinedAt.toMillis
+        ? aJoinedAt.toMillis()
+        : new Date(aJoinedAt as string | number | Date).getTime();
+      const bTime = bJoinedAt && typeof bJoinedAt === 'object' && 'toMillis' in bJoinedAt && bJoinedAt.toMillis
+        ? bJoinedAt.toMillis()
+        : new Date(bJoinedAt as string | number | Date).getTime();
       return aTime - bTime;
     });
 
@@ -179,7 +181,7 @@ export function getCurrentActionDescription(gameState: CloneGameState): string {
     case 'results':
       if (gameState.roundResult) {
         const { guess, actual, correct } = gameState.roundResult;
-        return `Guess: ${guess.toUpperCase()} | Actual: ${actual.toUpperCase()} | ${correct ? '✅ Correct!' : '❌ Wrong'}`;
+        return `Guess: ${(guess || 'Unknown').toUpperCase()} | Actual: ${(actual || 'Unknown').toUpperCase()} | ${correct ? '✅ Correct!' : '❌ Wrong'}`;
       }
       return 'Calculating results...';
       
