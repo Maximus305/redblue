@@ -1,6 +1,6 @@
 import React from 'react';
 import { getErrorMessage } from '@/utils/errorMessages';
-import { colors, typography, borderRadius, spacing } from '@/styles/clone-theme';
+import { Warning } from '@phosphor-icons/react';
 
 interface ErrorScreenProps {
   error: string;
@@ -11,22 +11,26 @@ export function ErrorScreen({ error, roomCode }: ErrorScreenProps) {
   return (
     <div
       className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: '#F9FAFB' }}
+      style={{ backgroundColor: '#0A0A0A' }}
     >
       <div
         className="max-w-md w-full text-center p-8"
         style={{
-          backgroundColor: colors.cardBg,
-          borderRadius: borderRadius.lg,
+          backgroundColor: '#1A1A1A',
+          borderRadius: '24px',
+          border: '2px solid #DC2626',
         }}
       >
-        <div className="text-6xl mb-6">⚠️</div>
+        <div className="flex justify-center mb-6">
+          <Warning size={64} weight="fill" color="#DC2626" />
+        </div>
         <h1
           className="mb-3"
           style={{
-            ...typography.large,
-            color: colors.error,
-            fontFamily: typography.fontFamily,
+            fontSize: '32px',
+            fontWeight: 900,
+            color: '#DC2626',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
           Connection Error
@@ -34,9 +38,9 @@ export function ErrorScreen({ error, roomCode }: ErrorScreenProps) {
         <p
           className="mb-4"
           style={{
-            fontSize: typography.bodyLarge.fontSize,
-            color: colors.textSecondary,
-            fontFamily: typography.fontFamily,
+            fontSize: '18px',
+            color: '#E5E5E5',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
           {getErrorMessage(error)}
@@ -44,9 +48,9 @@ export function ErrorScreen({ error, roomCode }: ErrorScreenProps) {
         <p
           className="mb-8"
           style={{
-            fontSize: typography.small.fontSize,
-            color: colors.textTertiary,
-            fontFamily: typography.fontFamily,
+            fontSize: '14px',
+            color: '#6B7280',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
           Room code: {roomCode}
@@ -56,15 +60,15 @@ export function ErrorScreen({ error, roomCode }: ErrorScreenProps) {
           className="transition-all"
           style={{
             height: '56px',
-            backgroundColor: colors.primaryBlue,
+            backgroundColor: '#DC2626',
             color: '#FFFFFF',
-            borderRadius: borderRadius.full,
-            fontSize: typography.bodyLarge.fontSize,
+            borderRadius: '28px',
+            fontSize: '18px',
             fontWeight: 700,
-            fontFamily: typography.fontFamily,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             border: 'none',
             cursor: 'pointer',
-            padding: `0 ${spacing.xxxl}`,
+            padding: '0 48px',
           }}
         >
           Return Home

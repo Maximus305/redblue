@@ -15,6 +15,7 @@ import {
 import { IconForWord } from '@/utils/codeWords';
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from 'qrcode.react';
+import { DecryptedText } from '@/components/ui/DecryptedText';
 
 // Type definitions
 interface AgentPageProps {
@@ -125,7 +126,10 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   const [votingStarted, setVotingStarted] = useState(false);
   const [showDiscussionScreen, setShowDiscussionScreen] = useState(false);
   const [showRevealScreen, setShowRevealScreen] = useState(false);
+  const [showRevealWaiting, setShowRevealWaiting] = useState(false);
   const [hostVotedCorrectly, setHostVotedCorrectly] = useState(false);
+  const [titleAnimationComplete, setTitleAnimationComplete] = useState(false);
+  const [isLateJoiner, setIsLateJoiner] = useState(false);
 
   const allCodeWords = [
     'Atlas', 'Balloon', 'Bamboo', 'Basket', 'Barrel',
@@ -142,7 +146,7 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
   // Use roomId as seed to keep consistent across reloads
   const spyCodeWords = useMemo(() => {
     if (!commonCodeWord || commonCodeWord === 'spy') {
-      // Fallback: return 20 random words if no common code word
+      // Fallback: return 18 random words if no common code word
       // Use roomId to seed the selection
       const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
       const shuffled = [...allCodeWords].sort((a, b) => {
@@ -150,10 +154,10 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
         const hashB = (b.charCodeAt(0) + seed) % allCodeWords.length;
         return hashA - hashB;
       });
-      return shuffled.slice(0, 20);
+      return shuffled.slice(0, 18);
     }
 
-    // Get 19 random words excluding the common code word
+    // Get 17 random words excluding the common code word
     const otherWords = allCodeWords.filter(w => w !== commonCodeWord);
     const seed = roomId ? roomId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
     const shuffled = otherWords.sort((a, b) => {
@@ -161,12 +165,12 @@ export default function RoomAgentPage({ params }: AgentPageProps) {
       const hashB = (b.charCodeAt(0) + seed) % otherWords.length;
       return hashA - hashB;
     });
-    const randomNineteen = shuffled.slice(0, 19);
+    const randomSeventeen = shuffled.slice(0, 17);
 
     // Combine with common code word and shuffle again
-    const result = [...randomNineteen, commonCodeWord].sort((a, b) => {
-      const hashA = (a.charCodeAt(0) + seed) % 20;
-      const hashB = (b.charCodeAt(0) + seed) % 20;
+    const result = [...randomSeventeen, commonCodeWord].sort((a, b) => {
+      const hashA = (a.charCodeAt(0) + seed) % 18;
+      const hashB = (b.charCodeAt(0) + seed) % 18;
       return hashA - hashB;
     });
     return result;
@@ -356,14 +360,25 @@ const fetchPlayerScores = async (): Promise<void> => {
         const data = agentSnap.data();
         setAgentId(data.agentId ?? null);
         setCodeWord(data.codeWord ?? null);
-        
+
         if (data.agentName) {
           setAgentName(data.agentName);
           localStorage.setItem(`agent_name_${roomId}_${agentSlug}`, data.agentName);
         }
-        
+
         if (data.isSpy !== undefined) {
           setIsSpy(Boolean(data.isSpy));
+        }
+      } else {
+        // Agent doesn't exist yet - check if game is already in progress
+        const settingsSnap = await getDoc(doc(db, "settings", roomId));
+        if (settingsSnap.exists()) {
+          const settings = settingsSnap.data();
+          if (settings.gameStarted === true) {
+            // Late joiner - game is in progress but they don't have data yet
+            console.log('🕐 Late joiner detected - game already in progress');
+            setIsLateJoiner(true);
+          }
         }
       }
       
@@ -387,6 +402,9 @@ const fetchPlayerScores = async (): Promise<void> => {
         }
       );
 
+      // Track if this is the first settings update (on page load/refresh)
+      let isFirstSettingsUpdate = true;
+
       // Set up settings listener
       const settingsRef = doc(db, "settings", roomId);
       const unsubscribeSettings = onSnapshot(settingsRef, async (snapshot) => {
@@ -398,6 +416,49 @@ const fetchPlayerScores = async (): Promise<void> => {
           setGameStarted(settings.gameStarted === true);
           setVotingStarted(settings.votingStarted === true);
           setCommonCodeWord(settings.commonCodeWord);
+
+          // On first load (page refresh), trust the agent's Firebase data instead of re-computing
+          // This prevents showing stale spy status from a previous round
+          if (isFirstSettingsUpdate && settings.gameStarted) {
+            isFirstSettingsUpdate = false;
+            console.log('🔄 First settings update - trusting agent Firebase data');
+
+            // Just read the agent's current spy status from Firebase
+            const currentAgentSnap = await getDoc(agentRef);
+            if (currentAgentSnap.exists()) {
+              const currentAgentData = currentAgentSnap.data();
+              console.log('👤 Using agent Firebase data:', {
+                isSpy: currentAgentData.isSpy,
+                codeWord: currentAgentData.codeWord
+              });
+
+              // Check if agent has valid game data for current round
+              // If codeWord is null/undefined, they're a late joiner
+              if (!currentAgentData.codeWord && currentGameMode === 'spy') {
+                console.log('🕐 Agent exists but no codeWord - late joiner');
+                setIsLateJoiner(true);
+                return;
+              }
+
+              setIsSpy(Boolean(currentAgentData.isSpy));
+              setCodeWord(currentAgentData.codeWord);
+              if (currentGameMode === 'spy') {
+                setIsSpymaster({ isRed: false, isBlue: false });
+              } else {
+                setIsSpymaster({
+                  isRed: agentSlug === settings.redSpymaster,
+                  isBlue: agentSlug === settings.blueSpymaster
+                });
+              }
+            } else {
+              // Agent doesn't exist and game is started - late joiner
+              console.log('🕐 Agent does not exist and game started - late joiner');
+              setIsLateJoiner(true);
+            }
+            return; // Skip the rest, we've synced from Firebase
+          }
+
+          isFirstSettingsUpdate = false;
 
           if (currentGameMode === 'spy') {
             // Check if user is spy - handle both formats: "dave" or "WHJT-BZRY_dave"
@@ -490,6 +551,11 @@ const fetchPlayerScores = async (): Promise<void> => {
             if (!dataIsConsistent) {
               console.log('⚠️  Skipping codeWord update - Firebase data is inconsistent');
               return currentCodeWord;
+            }
+            // If late joiner now has a valid codeWord, they can play!
+            if (newCodeWord && newCodeWord !== currentCodeWord) {
+              console.log('🎮 Late joiner now has codeWord - transitioning to game');
+              setIsLateJoiner(false);
             }
             return newCodeWord;
           });
@@ -625,6 +691,13 @@ const fetchPlayerScores = async (): Promise<void> => {
   }, [votingStarted, gameStarted]);
 
   // Listen for revealSpy flag and determine if host voted correctly
+  // Use a ref to track if we've already processed the reveal to avoid duplicate triggers
+  const hasProcessedReveal = useRef(false);
+  const hasProcessedNewRound = useRef(false);
+
+  // Track if we've done the initial state sync
+  const hasInitializedGameState = useRef(false);
+
   useEffect(() => {
     if (!roomId) return;
 
@@ -633,8 +706,64 @@ const fetchPlayerScores = async (): Promise<void> => {
       if (snapshot.exists()) {
         const data = snapshot.data();
 
-        // Check for reveal spy trigger
-        if (data.revealSpy === true && !showRevealScreen) {
+        // On initial load (page refresh), sync to the current game state
+        // This ensures we show the correct screen after a reload
+        if (!hasInitializedGameState.current) {
+          hasInitializedGameState.current = true;
+          console.log('🔄 Initial game state sync:', {
+            revealSpy: data.revealSpy,
+            votingStarted: data.votingStarted,
+            gameStarted: data.gameStarted
+          });
+
+          // Fetch current agent data to get correct spy status
+          const agentKey = `${roomId}_${agentSlug}`;
+          const agentRef = doc(db, "agents", agentKey);
+          const agentSnap = await getDoc(agentRef);
+
+          if (agentSnap.exists()) {
+            const agentData = agentSnap.data();
+            console.log('🔄 Initial agent data:', {
+              isSpy: agentData.isSpy,
+              codeWord: agentData.codeWord
+            });
+            setIsSpy(Boolean(agentData.isSpy));
+            setCodeWord(agentData.codeWord);
+          }
+
+          // Set the correct screen based on current game state
+          if (data.revealSpy === true) {
+            // We're in reveal mode - show reveal screen
+            hasProcessedReveal.current = true;
+
+            // Get spy information to check if host voted correctly
+            const agentsQuery = query(
+              collection(db, "agents"),
+              where("roomId", "==", roomId)
+            );
+            const agentsSnap = await getDocs(agentsQuery);
+            const spyAgent = agentsSnap.docs.find(doc => doc.data().isSpy);
+            const spyId = spyAgent?.id;
+            const votedCorrectly = data.hostVotedFor === spyId;
+            setHostVotedCorrectly(votedCorrectly);
+
+            setShowRevealScreen(true);
+            setShowDiscussionScreen(false);
+            setShowRevealWaiting(false);
+          } else if (data.votingStarted === true && data.gameStarted === true) {
+            // We're in discussion mode
+            setShowDiscussionScreen(true);
+            setShowRevealScreen(false);
+            setShowRevealWaiting(false);
+          }
+          return; // Skip the rest of the handler for initial sync
+        }
+
+        // Check for reveal spy trigger - use ref to prevent duplicate processing
+        if (data.revealSpy === true && !hasProcessedReveal.current) {
+          hasProcessedReveal.current = true;
+          console.log('🎭 Reveal spy triggered!');
+
           // Get spy information and check if host voted correctly
           const agentsQuery = query(
             collection(db, "agents"),
@@ -652,17 +781,28 @@ const fetchPlayerScores = async (): Promise<void> => {
           const votedCorrectly = hostVotedForId === spyId;
           setHostVotedCorrectly(votedCorrectly);
 
-          setShowRevealScreen(true);
+          // Show reveal screen immediately
+          setShowRevealWaiting(false);
           setShowDiscussionScreen(false);
+          setShowRevealScreen(true);
+        } else if (data.revealSpy === false) {
+          // Reset the flag when revealSpy is set back to false
+          hasProcessedReveal.current = false;
+          // Also hide the reveal screen if it was showing
+          setShowRevealScreen(false);
         }
 
         // Check for new round
-        if (data.newRoundStarted === true) {
+        if (data.newRoundStarted === true && !hasProcessedNewRound.current) {
+          hasProcessedNewRound.current = true;
           console.log('🔄 New round started - resetting all state');
           setShowRevealScreen(false);
+          setShowRevealWaiting(false);
           setShowDiscussionScreen(false);
           setVotingStarted(false);
           setHostVotedCorrectly(false);
+          setTitleAnimationComplete(false);
+          setIsLateJoiner(false); // Late joiners can now play
 
           // Force refresh of spy status and code word from Firebase
           // This ensures we don't show stale spy UI
@@ -679,12 +819,15 @@ const fetchPlayerScores = async (): Promise<void> => {
               codeWord: agentData.codeWord
             });
           }
+        } else if (data.newRoundStarted === false) {
+          // Reset the flag when newRoundStarted is set back to false
+          hasProcessedNewRound.current = false;
         }
       }
     });
 
     return () => unsubscribe();
-  }, [roomId, showRevealScreen]);
+  }, [roomId, agentSlug]);
 
 
   const updateAgentForSpyMode = async (settings: SettingsData) => {
@@ -891,12 +1034,12 @@ const fetchPlayerScores = async (): Promise<void> => {
   if (hasBeenRemoved) {
     return (
       <RemovedAlert onClose={() => {
-        router.push('/');
+        router.push('/rooms');
       }} />
     );
   }
 
-  // Show loading state with gray background
+  // Show loading state
   if (loading) {
     return (
       <div
@@ -904,6 +1047,108 @@ const fetchPlayerScores = async (): Promise<void> => {
         style={{ backgroundColor: '#F9FAFB' }}
       >
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#000000' }} />
+      </div>
+    );
+  }
+
+  // Late joiner screen - game in progress, wait for next round
+  if (isLateJoiner && gameStarted) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ backgroundColor: '#F9FAFB' }}
+      >
+        <div className="w-full max-w-md text-center">
+          {/* Title */}
+          <h1
+            className="mb-6"
+            style={{
+              fontSize: '42px',
+              fontWeight: 400,
+              color: '#000000',
+              fontFamily: 'var(--font-barrio)',
+              lineHeight: 1.1,
+            }}
+          >
+            WHO&apos;S THE SPY
+          </h1>
+
+          {/* Game in Progress Message */}
+          <div
+            className="p-6 mb-6"
+            style={{
+              backgroundColor: '#000000',
+              borderRadius: '24px',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '32px',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                fontFamily: 'monospace',
+                marginBottom: '16px',
+              }}
+            >
+              <DecryptedText text="Game in Progress" speed={40} />
+            </h2>
+            <p
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#999999',
+                fontFamily: 'monospace',
+              }}
+            >
+              <DecryptedText text="Please wait for the next round to start" speed={30} />
+            </p>
+          </div>
+
+          {/* Animated waiting indicator */}
+          <div
+            className="flex justify-center gap-2"
+            style={{ animation: 'pulse 2s infinite' }}
+          >
+            <div
+              style={{
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#000000',
+                borderRadius: '50%',
+                animation: 'pulse 1.5s infinite 0s',
+              }}
+            />
+            <div
+              style={{
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#000000',
+                borderRadius: '50%',
+                animation: 'pulse 1.5s infinite 0.3s',
+              }}
+            />
+            <div
+              style={{
+                width: '12px',
+                height: '12px',
+                backgroundColor: '#000000',
+                borderRadius: '50%',
+                animation: 'pulse 1.5s infinite 0.6s',
+              }}
+            />
+          </div>
+        </div>
+
+        <style jsx>{`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.3;
+            }
+          }
+        `}</style>
       </div>
     );
   }
@@ -960,7 +1205,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 key={agent.id}
                 className="p-2.5 mb-2.5 mx-auto"
                 style={{
-                  backgroundColor: isMe ? '#FDD804' : '#FFFFFF',
+                  backgroundColor: isMe ? '#000000' : '#FFFFFF',
                   border: isMe ? 'none' : '2px solid #E5E5E5',
                   borderRadius: '9999px',
                   width: '65%',
@@ -972,7 +1217,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                   style={{
                     fontSize: '16px',
                     fontWeight: 700,
-                    color: '#000000',
+                    color: isMe ? '#FFFFFF' : '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >
@@ -1009,18 +1254,34 @@ const fetchPlayerScores = async (): Promise<void> => {
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       style={{
-        backgroundColor: (showRevealScreen && isSpy) ? '#DC2626' : '#FDD804',
+        backgroundColor: (showRevealScreen && isSpy) ? '#000000' : '#F9FAFB',
       }}
     >
       {/* Show the removed alert if the player has been removed */}
       {hasBeenRemoved && (
         <RemovedAlert onClose={() => {
-          router.push('/');
+          router.push('/rooms');
         }} />
       )}
 
-      {/* Reveal Screen */}
-      {showRevealScreen ? (
+      {/* Reveal Waiting Screen - Listen to host */}
+      {showRevealWaiting ? (
+        <div className="w-full max-w-md flex items-center justify-center px-4" style={{ minHeight: '60vh' }}>
+          <div className="text-center">
+            <h1
+              style={{
+                fontSize: 'clamp(40px, 10vw, 64px)',
+                fontWeight: 900,
+                color: '#000000',
+                fontFamily: 'monospace',
+                letterSpacing: '2px',
+              }}
+            >
+              <DecryptedText text={isSpy ? 'Reveal yourself.' : 'Listen to host.'} speed={40} />
+            </h1>
+          </div>
+        </div>
+      ) : showRevealScreen ? (
         <div
           className="w-full max-w-md flex flex-col items-center justify-center"
           style={{
@@ -1028,115 +1289,117 @@ const fetchPlayerScores = async (): Promise<void> => {
           }}
         >
           {isSpy ? (
-            // Spy sees "SPY" at top, "REVEAL YOURSELF" at bottom on red background
-            <div className="text-center w-full flex flex-col justify-between" style={{ minHeight: '60vh' }}>
-              {/* SPY at top - huge */}
+            // Spy sees "SPY" on yellow background
+            <div className="text-center w-full flex flex-col justify-between items-center" style={{ minHeight: '100vh', paddingBottom: '80px', position: 'relative' }}>
+              {/* Empty space at top */}
+              <div></div>
+
+              {/* SPY - centered and huge */}
               <h1
                 style={{
-                  fontSize: '120px',
+                  fontSize: 'clamp(100px, 25vw, 180px)',
                   fontWeight: 900,
-                  color: '#FFFFFF',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '12px',
+                  color: '#DC2626',
+                  fontFamily: 'monospace',
+                  letterSpacing: '8px',
                   lineHeight: 1,
+                  position: 'relative',
+                  zIndex: 1,
                 }}
               >
-                SPY
+                <DecryptedText text="SPY" speed={80} />
               </h1>
 
-              {/* REVEAL YOURSELF at bottom */}
-              <div>
+              {/* REVEAL YOURSELF and points - at bottom */}
+              <div style={{ position: 'relative', zIndex: 1 }}>
                 <h2
-                  className="mb-4"
+                  className="mb-2"
                   style={{
-                    fontSize: '48px',
+                    fontSize: '32px',
                     fontWeight: 900,
                     color: '#FFFFFF',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontFamily: 'monospace',
                     letterSpacing: '4px',
                     lineHeight: 1.1,
                   }}
                 >
-                  REVEAL YOURSELF
+                  <DecryptedText text="Reveal yourself." speed={40} />
                 </h2>
 
                 {/* Points display - only show if spy got the point */}
                 {!hostVotedCorrectly && (
                   <h3
                     style={{
-                      fontSize: '24px',
+                      fontSize: '20px',
                       fontWeight: 900,
                       color: '#FFFFFF',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      fontFamily: 'monospace',
                       letterSpacing: '2px',
                     }}
                   >
-                    +1 POINT FOR SPY
+                    <DecryptedText text="+1 point for spy." speed={30} />
                   </h3>
                 )}
               </div>
             </div>
           ) : (
-            // Non-spy sees message on yellow background
-            <div className="text-center w-full">
-              <p
-                className="mb-8"
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 700,
-                  color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '1px',
-                }}
-              >
-                THE SPY WILL NOW REVEAL HIMSELF
-              </p>
-
+            // Non-spy sees message
+            <div className="text-center w-full px-4">
               <h1
                 style={{
-                  fontSize: '48px',
+                  fontSize: 'clamp(32px, 8vw, 56px)',
                   fontWeight: 900,
                   color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  letterSpacing: '4px',
+                  fontFamily: 'monospace',
+                  letterSpacing: '2px',
                 }}
               >
-                WAITING FOR NEW ROUND...
+                <DecryptedText text="The spy will now reveal himself." speed={30} />
               </h1>
             </div>
           )}
         </div>
       ) : showDiscussionScreen ? (
         // Discussion Screen - Simple text based on spy status
-        <div className="w-full max-w-md flex items-center justify-center" style={{ minHeight: '60vh' }}>
+        <div className="w-full max-w-md flex items-center justify-center px-4" style={{ minHeight: '60vh' }}>
           <div className="text-center">
             <h1
               style={{
-                fontSize: '64px',
+                fontSize: 'clamp(32px, 8vw, 48px)',
                 fontWeight: 900,
                 color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                letterSpacing: '4px',
+                fontFamily: 'monospace',
+                letterSpacing: '2px',
+                lineHeight: 1.2,
               }}
             >
-              {isSpy ? 'BLEND IN' : 'LISTEN TO HOST'}
+              <DecryptedText
+                text={isSpy
+                  ? 'Convince others you are not the spy.'
+                  : 'Discuss with the host on who the spy is.'}
+                speed={30}
+              />
             </h1>
           </div>
         </div>
       ) : (
-      <div className={`w-full max-w-md transform transition-all duration-300 relative z-10 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+      <div className={`w-full max-w-md transform transition-all duration-300 relative z-10 px-2 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
         {/* Instructions */}
         <h2
           className="text-center mb-10"
           style={{
-            fontSize: '52px',
+            fontSize: 'clamp(28px, 7vw, 44px)',
             fontWeight: 900,
             color: '#000000',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            fontFamily: 'monospace',
             lineHeight: 1.1,
           }}
         >
-          Describe your sign in one word
+          <DecryptedText
+            text="Describe your sign in one word"
+            speed={25}
+            onComplete={() => setTitleAnimationComplete(true)}
+          />
         </h2>
         {error && (
           <div
@@ -1207,53 +1470,8 @@ const fetchPlayerScores = async (): Promise<void> => {
               </div>
             )}
 
-            {/* Agent Name - Only for non-spies */}
-            {!(isSpy || codeWord === 'spy') && (
-              <div className="mb-6">
-                <p
-                  className="mb-2 text-center"
-                  style={{
-                    fontSize: '20px',
-                    fontWeight: 700,
-                    color: '#000000',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  }}
-                >
-                  OPERATIVE
-                </p>
-                <div
-                  className="p-4"
-                  style={{
-                    backgroundColor: '#000000',
-                    border: 'none',
-                    borderRadius: '24px',
-                  }}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
-                      CLR-{Math.floor(Math.random() * 9000 + 1000)}
-                    </span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
-                      SECTOR {String.fromCharCode(65 + Math.floor(Math.random() * 26))}{Math.floor(Math.random() * 9)}
-                    </span>
-                  </div>
-                  <p
-                    className="text-center"
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: '#FDD804',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    }}
-                  >
-                    {agentName || agentId}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Code Sign / Spy Status */}
-            <div>
+            {/* Code Sign / Spy Status - only show after title animation */}
+            <div style={{ opacity: titleAnimationComplete ? 1 : 0, transition: 'opacity 0.5s ease-in' }}>
               {!isSpy && codeWord !== 'spy' && (
                 <p
                   className="mb-2 text-center"
@@ -1292,7 +1510,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                     </span>
                   </div>
                   <div className="flex items-center justify-center" style={{ aspectRatio: '1/1', maxHeight: '350px', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '16px', overflow: 'hidden' }}>
+                    <div style={{ borderRadius: '16px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <IconForWord word={codeWord} size={280} />
                     </div>
                   </div>
@@ -1305,7 +1523,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                           y={0}
                           width={Math.random() > 0.5 ? 2 : 1}
                           height={40}
-                          fill="#FDD804"
+                          fill="#FFFFFF"
                         />
                       ))}
                     </svg>
@@ -1344,9 +1562,9 @@ const fetchPlayerScores = async (): Promise<void> => {
           </div>
         )}
 
-        {/* Spy Code Words Grid */}
+        {/* Spy Code Words Grid - only show after title animation */}
         {(isSpy || codeWord === 'spy') && agentId && (
-          <div className="mt-8">
+          <div className="mt-8" style={{ opacity: titleAnimationComplete ? 1 : 0, transition: 'opacity 0.5s ease-in' }}>
             <div
               className="p-6"
               style={{
@@ -1368,7 +1586,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 style={{
                   fontSize: '48px',
                   fontWeight: 900,
-                  color: '#FDD804',
+                  color: '#DC2626',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
@@ -1379,13 +1597,13 @@ const fetchPlayerScores = async (): Promise<void> => {
                 style={{
                   fontSize: '16px',
                   fontWeight: 700,
-                  color: '#FDD804',
+                  color: '#FFFFFF',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
                 Possible Code Signs
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {spyCodeWords.map((word) => (
                   <div
                     key={word}
@@ -1505,6 +1723,16 @@ const fetchPlayerScores = async (): Promise<void> => {
           0% { opacity: 1; }
           60% { opacity: 1; }
           100% { opacity: 0; }
+        }
+        @keyframes spyPulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.85;
+            transform: scale(1.02);
+          }
         }
       `}</style>
     </div>

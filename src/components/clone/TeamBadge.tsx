@@ -1,5 +1,5 @@
 import React from 'react';
-import { getTeamColor, getTeamImage } from '@/services/clone';
+import { getTeamColor, getTeamImage } from '@/services/clone/index';
 
 interface TeamBadgeProps {
   teamId: 'A' | 'B';

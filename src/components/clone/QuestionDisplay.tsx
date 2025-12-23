@@ -7,14 +7,14 @@ interface QuestionDisplayProps {
 const QuestionDisplay: React.FC<QuestionDisplayProps> = ({ question }) => {
   return (
     <div style={{
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: 'black',
       padding: '24px',
       borderRadius: '20px',
       marginBottom: '30px'
     }}>
       <p style={{
         fontSize: '24px',
-        color: 'black',
+        color: 'white',
         margin: 0,
         lineHeight: '1.4',
         fontWeight: '600',

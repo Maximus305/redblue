@@ -11,65 +11,76 @@ export function VotingScreen({
 }: VotingScreenProps) {
   const speakerId = currentRound?.speakerId;
   const speaker = speakerId ? players.find(p => p.id === speakerId) : null;
-  const speakerName = speaker?.name || 'the speaker';
+  const speakerName = speaker?.name || 'Speaker';
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: '#F9FAFB' }}
+      className="min-h-screen flex flex-col justify-center p-6"
+      style={{ backgroundColor: '#FFFFFF' }}
     >
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-lg mx-auto">
         {!hasVoted ? (
           <>
             {/* Title */}
             <h1
-              className="mb-8"
+              className="mb-6"
               style={{
-                fontSize: '42px',
-                fontWeight: 700,
-                color: '#000000',
+                fontSize: '48px',
+                fontWeight: 900,
+                color: '#0000FF',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
-              Who&apos;s response was this?
+              Was that...
             </h1>
 
+            {/* Subtitle */}
+            <p
+              className="mb-20"
+              style={{
+                fontSize: '24px',
+                fontWeight: 500,
+                color: 'rgba(0,0,255,0.7)',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              }}
+            >
+              {speakerName}&apos;s real answer or AI?
+            </p>
+
             {/* Vote Buttons */}
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <button
-                onClick={() => onVote('AI')}
-                className="w-full transition-all"
+                onClick={() => onVote('Self')}
+                className="w-full transition-all flex flex-col items-center justify-center"
                 style={{
-                  height: '100px',
-                  backgroundColor: '#0045FF',
+                  height: '160px',
+                  backgroundColor: '#0000FF',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: '50px',
-                  fontSize: '28px',
-                  fontWeight: 600,
+                  borderRadius: '24px',
                   cursor: 'pointer',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
-                AI response
+                <span style={{ fontSize: '40px', fontWeight: 900 }}>Self Made</span>
+                <span style={{ fontSize: '24px', fontWeight: 600 }}>Response</span>
               </button>
 
               <button
-                onClick={() => onVote('Self')}
-                className="w-full transition-all"
+                onClick={() => onVote('AI')}
+                className="w-full transition-all flex flex-col items-center justify-center"
                 style={{
-                  height: '100px',
-                  backgroundColor: '#0045FF',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '50px',
-                  fontSize: '28px',
-                  fontWeight: 600,
+                  height: '160px',
+                  backgroundColor: 'transparent',
+                  color: '#0000FF',
+                  border: '3px solid #0000FF',
+                  borderRadius: '24px',
                   cursor: 'pointer',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
-                {speakerName}&apos;s
+                <span style={{ fontSize: '40px', fontWeight: 900 }}>AI</span>
+                <span style={{ fontSize: '24px', fontWeight: 600 }}>Response</span>
               </button>
             </div>
           </>
@@ -77,22 +88,21 @@ export function VotingScreen({
           <>
             {/* Voted Confirmation */}
             <h1
-              className="text-center mb-4"
+              className="mb-4"
               style={{
-                fontSize: '52px',
-                fontWeight: 700,
-                color: '#000000',
+                fontSize: '48px',
+                fontWeight: 900,
+                color: '#0000FF',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
-              Voted!
+              Vote locked in.
             </h1>
             <p
-              className="text-center"
               style={{
-                fontSize: '28px',
-                fontWeight: 400,
-                color: '#666666',
+                fontSize: '24px',
+                fontWeight: 500,
+                color: 'rgba(0,0,255,0.7)',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >

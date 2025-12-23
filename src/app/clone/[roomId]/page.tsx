@@ -102,6 +102,7 @@ export default function CloneRoomJoinPage({ params }: CloneRoomJoinPageProps) {
           currentRound={game.currentRound}
           speakerChoice={game.speakerChoice}
           onChoice={game.handleSpeakerChoice}
+          onOpenVoting={game.handleOpenVoting}
           prepTimeRemaining={game.prepTimeRemaining}
           loading={game.loading}
           error={game.error}

@@ -14,8 +14,13 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
   const questionText = currentRound?.questionText || currentRound?.question || '';
   const isMeSpeaker = me?.id === speakerId;
 
-  // Check if we're waiting for calibration completion
-  const showCalibrationStatus = me?.hasCompletedCalibration === true;
+  // Listener step is determined by whether speaker has made their choice
+  // When speakerChoice is set, listeners know the speaker is now answering
+  const speakerHasChosen = currentRound?.speakerChoice !== null && currentRound?.speakerChoice !== undefined;
+
+  // Check if we're waiting for calibration completion (only during LOBBY or CALIBRATE phases)
+  const isCalibrationPhase = room?.status.phase === 'LOBBY' || room?.status.phase === 'CALIBRATE';
+  const showCalibrationStatus = isCalibrationPhase && me?.hasCompletedCalibration === true;
 
   // If game is over, show game over screen
   if (room?.status.phase === 'END') {
@@ -27,7 +32,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
     return (
       <div
         className="min-h-screen flex items-center justify-center p-6"
-        style={{ backgroundColor: isWinner ? '#0045FF' : '#F9FAFB' }}
+        style={{ backgroundColor: '#FFFFFF' }}
       >
         <div className="w-full max-w-md">
           {/* Winner Announcement */}
@@ -36,7 +41,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
               style={{
                 fontSize: '120px',
                 fontWeight: 900,
-                color: isWinner ? '#FFFFFF' : '#000000',
+                color: '#0000FF',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 marginBottom: '16px',
                 lineHeight: 1,
@@ -49,7 +54,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
               style={{
                 fontSize: '120px',
                 fontWeight: 900,
-                color: isWinner ? '#FFFFFF' : '#0045FF',
+                color: '#0000FF',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 marginBottom: '24px',
                 lineHeight: 1,
@@ -62,7 +67,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
             {/* Points Display */}
             <div
               style={{
-                backgroundColor: isWinner ? '#FFFFFF' : '#0045FF',
+                backgroundColor: '#0000FF',
                 borderRadius: '24px',
                 padding: '24px',
                 display: 'inline-block',
@@ -72,7 +77,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                 style={{
                   fontSize: '48px',
                   fontWeight: 900,
-                  color: isWinner ? '#0045FF' : '#FFFFFF',
+                  color: '#FFFFFF',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   margin: 0,
                 }}
@@ -88,7 +93,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
               style={{
                 fontSize: '28px',
                 fontWeight: 700,
-                color: isWinner ? '#FFFFFF' : '#000000',
+                color: '#0000FF',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 marginBottom: '20px',
                 textAlign: 'center',
@@ -105,8 +110,8 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                     key={player.id}
                     className="flex items-center justify-between"
                     style={{
-                      backgroundColor: isMe ? (isWinner ? '#FFFFFF' : '#0045FF') : (isWinner ? 'rgba(255, 255, 255, 0.2)' : '#FFFFFF'),
-                      border: isFirst && !isMe ? `3px solid ${isWinner ? '#FFFFFF' : '#0045FF'}` : (!isMe && !isWinner ? '3px solid #E5E7EB' : 'none'),
+                      backgroundColor: isMe ? '#0000FF' : 'rgba(0,0,255,0.1)',
+                      border: isFirst && !isMe ? '2px solid #0000FF' : 'none',
                       borderRadius: '20px',
                       padding: isFirst ? '20px 24px' : '16px 24px',
                     }}
@@ -115,7 +120,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                       style={{
                         fontSize: isFirst ? '28px' : '24px',
                         fontWeight: isFirst ? 700 : 600,
-                        color: isMe ? (isWinner ? '#0045FF' : '#FFFFFF') : (isWinner ? '#FFFFFF' : '#000000'),
+                        color: isMe ? '#FFFFFF' : '#0000FF',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       }}
                     >
@@ -125,7 +130,7 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                       style={{
                         fontSize: isFirst ? '32px' : '28px',
                         fontWeight: 900,
-                        color: isMe ? (isWinner ? '#0045FF' : '#FFFFFF') : (isWinner ? '#FFFFFF' : '#000000'),
+                        color: isMe ? '#FFFFFF' : '#0000FF',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       }}
                     >
@@ -164,17 +169,99 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
     );
   }
 
-  // If there's a speaker assigned (during speaking phase), show listening/speaking screen
+  // If we're in SPEAKER_DECIDE phase, show listening/speaking screen
+  // (non-speakers see this while the speaker is choosing)
+  if (room?.status.phase === 'SPEAKER_DECIDE') {
+    const speakerName = speaker?.name || 'The host';
+
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{ backgroundColor: '#F9FAFB' }}
+      >
+        <div className="w-full max-w-md">
+          {/* Before speaker has chosen: Show "about to speak" */}
+          {!speakerHasChosen && (
+            <div style={{ textAlign: 'center' }}>
+              <h1
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 900,
+                  color: '#000000',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  lineHeight: 1.1,
+                  marginBottom: '24px',
+                }}
+              >
+                {speakerName} is about to speak.
+              </h1>
+
+              <p
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 500,
+                  color: '#6B7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                Get ready to listen.
+              </p>
+            </div>
+          )}
+
+          {/* After speaker has chosen: Show "is answering" */}
+          {speakerHasChosen && (
+            <div style={{ textAlign: 'center' }}>
+              <h1
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 900,
+                  color: '#000000',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  lineHeight: 1.1,
+                  marginBottom: '24px',
+                }}
+              >
+                {speakerName} is answering.
+              </h1>
+
+              <p
+                style={{
+                  fontSize: '24px',
+                  fontWeight: 600,
+                  color: '#000000',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  marginBottom: '16px',
+                }}
+              >
+                Human or AI?
+              </p>
+
+              <p
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 500,
+                  color: '#6B7280',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                }}
+              >
+                Voting will open soon...
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // If there's a speaker assigned (during other phases), show listening/speaking screen
   const isActiveRoundWithSpeaker = speaker && currentRound && (
     questionText ||
-    room?.status.phase === 'SPEAKER_DECIDE' ||
     room?.status.phase === 'ROUND_INTRO' ||
     currentRound.speakerId
   );
 
   if (isActiveRoundWithSpeaker) {
-    const isMeSpeaker = me?.id === speaker.id;
-
     return (
       <div
         className="min-h-screen flex items-center justify-center p-6"
@@ -230,8 +317,8 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                 key={player.id}
                 className="flex items-center justify-between"
                 style={{
-                  backgroundColor: isMe ? '#0045FF' : '#FFFFFF',
-                  border: isMe ? 'none' : '3px solid #E5E7EB',
+                  backgroundColor: isMe ? '#0000FF' : '#FFFFFF',
+                  border: isMe ? 'none' : '2px solid #E5E7EB',
                   borderRadius: '20px',
                   padding: '14px 20px',
                 }}
@@ -253,13 +340,13 @@ export function WaitScreen({ me, players, currentRound, room }: WaitScreenProps)
                     <Check
                       size={32}
                       weight="bold"
-                      color={isMe ? '#FFFFFF' : '#0045FF'}
+                      color={isMe ? '#FFFFFF' : '#000000'}
                     />
                   ) : (
                     <X
                       size={32}
                       weight="bold"
-                      color={isMe ? '#FFFFFF' : '#DC2626'}
+                      color={isMe ? '#FFFFFF' : '#000000'}
                     />
                   )
                 )}

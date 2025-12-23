@@ -46,5 +46,19 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null;
     }
+
+    // Agents - prevent duplicate documents without room prefix
+    match /agents/{agentId} {
+      allow read: if true;
+      // Only allow writes if the document ID contains an underscore (room prefix format)
+      // OR if it's the special Agent01 document
+      allow write: if agentId == 'Agent01' || agentId.matches('.*_.*');
+    }
+
+    // Settings - anyone can read, authenticated users can write
+    match /settings/{roomId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }

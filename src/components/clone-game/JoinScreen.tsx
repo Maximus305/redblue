@@ -1,10 +1,8 @@
 import React from 'react';
-import Image from 'next/image';
 import { JoinScreenProps } from '@/types/clone';
 import { getErrorMessage } from '@/utils/errorMessages';
 
 export function JoinScreen({
-  roomCode,
   name,
   setName,
   onJoin,
@@ -19,37 +17,13 @@ export function JoinScreen({
       style={{ backgroundColor: '#F9FAFB' }}
     >
       <div className="w-full max-w-md">
-        {/* Room Code */}
-        <p
-          className="text-center mb-4"
-          style={{
-            fontSize: '20px',
-            fontWeight: 600,
-            color: '#000000',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          }}
-        >
-          ROOM: {roomCode}
-        </p>
-
-        {/* Pig Image */}
-        <div className="flex justify-center mb-8">
-          <Image
-            src="/pigimage.png"
-            alt="Clone"
-            width={320}
-            height={200}
-            style={{ objectFit: 'contain' }}
-          />
-        </div>
-
-        {/* Logo/Title */}
+        {/* Title */}
         <h1
-          className="text-center mb-8"
+          className="text-center mb-2"
           style={{
-            fontSize: '96px',
+            fontSize: '72px',
             fontWeight: 900,
-            color: '#000000',
+            color: '#0000FF',
             fontFamily: 'Ojuju, sans-serif',
             letterSpacing: '0.02em',
           }}
@@ -57,33 +31,35 @@ export function JoinScreen({
           CLONE
         </h1>
 
+        {/* Subtitle */}
+        <p
+          className="text-center mb-8"
+          style={{
+            fontSize: '18px',
+            fontWeight: 600,
+            color: '#0000FF',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          }}
+        >
+          Enter your name to join
+        </p>
+
         {/* Name Input */}
-        <div className="mb-4">
-          <label
-            className="block mb-2"
-            style={{
-              fontSize: '24px',
-              fontWeight: 400,
-              color: '#000000',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            }}
-          >
-            Type a name:
-          </label>
+        <div className="mb-6">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Jason..."
+            placeholder="Your name..."
             maxLength={20}
             className="w-full focus:outline-none"
             style={{
               backgroundColor: '#FFFFFF',
-              border: '3px solid #E5E7EB',
-              borderRadius: '12px',
+              border: '2px solid #E5E7EB',
+              borderRadius: '20px',
               padding: '20px 24px',
               fontSize: '24px',
-              fontWeight: 400,
+              fontWeight: 600,
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               color: '#000000',
             }}
@@ -97,13 +73,14 @@ export function JoinScreen({
             style={{
               backgroundColor: '#FEE2E2',
               borderRadius: '12px',
+              border: '2px solid #FECACA',
             }}
           >
             <p
               className="text-center"
               style={{
-                fontWeight: 500,
-                fontSize: '20px',
+                fontWeight: 600,
+                fontSize: '16px',
                 color: '#DC2626',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
@@ -119,18 +96,19 @@ export function JoinScreen({
           disabled={loading || !isValid}
           className="w-full transition-all"
           style={{
-            height: '80px',
-            backgroundColor: !loading && isValid ? '#0045FF' : '#A8A8AD',
-            color: '#FFFFFF',
-            borderRadius: '40px',
-            fontSize: '28px',
-            fontWeight: 600,
-            border: 'none',
+            backgroundColor: !loading && isValid ? '#0000FF' : '#E5E7EB',
+            color: !loading && isValid ? '#FFFFFF' : '#000000',
+            border: '2px solid',
+            borderColor: !loading && isValid ? '#0000FF' : '#E5E7EB',
+            borderRadius: '100px',
+            fontSize: '24px',
+            fontWeight: 900,
             cursor: loading || !isValid ? 'not-allowed' : 'pointer',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            padding: '20px 0',
           }}
         >
-          {loading ? 'Joining...' : 'Join'}
+          {loading ? 'JOINING...' : 'JOIN GAME'}
         </button>
       </div>
     </div>

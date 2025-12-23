@@ -3,7 +3,7 @@
  * Core Principle: Every screen must ALWAYS know WHO you are, WHAT your role is, WHAT you can do
  */
 
-import { CloneGameState } from '@/services/clone';
+import { CloneGameState } from '@/services/clone/index';
 
 // Player role types
 export type PlayerRole = 'QUESTIONER' | 'RESPONDER' | 'VOTER' | 'SPECTATOR';

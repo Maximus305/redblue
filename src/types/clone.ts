@@ -140,6 +140,7 @@ export interface CalibrationScreenProps extends BaseScreenProps {
 export interface SpeakerDecideScreenProps extends BaseScreenProps {
   speakerChoice: 'AI' | 'Self' | null;
   onChoice: (choice: 'AI' | 'Self') => void;
+  onOpenVoting: () => void;
   prepTimeRemaining: number;
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, auth, openVotingFn } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import {
   doc,
   setDoc,
@@ -22,32 +22,38 @@ import {
 } from '@/types/clone';
 
 export function useCloneGame(roomCode: string) {
+  // State - Core data
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [currentRound, setCurrentRound] = useState<Round | null>(null);
   const [myId, setMyId] = useState<string>('');
   const [me, setMe] = useState<Player | null>(null);
 
+  // State - UI
   const [error, setError] = useState<ErrorCode | string>('');
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(true);
 
+  // State - Join screen
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState<string>(COLOR_OPTIONS[0]);
 
+  // State - Calibration
   const [calibrationQuestions, setCalibrationQuestions] = useState<CalibrationQuestion[]>([]);
   const [calibrationAnswers, setCalibrationAnswers] = useState<Record<number, number>>({});
 
+  // State - Speaker Decide
   const [speakerChoice, setSpeakerChoice] = useState<'AI' | 'Self' | null>(null);
-  const [preloadedAiResponse, setPreloadedAiResponse] = useState<string | null>(null);
-  const [isPreloadingAi, setIsPreloadingAi] = useState(false);
 
+  // State - Voting
   const [hasVoted, setHasVoted] = useState(false);
   const [myVote, setMyVote] = useState<'AI' | 'Self' | null>(null);
   const [timeRemaining] = useState<number>(0);
 
+  // State - Speaker Preparation
   const [prepTimeRemaining] = useState<number>(0);
 
+  // Derived state
   const isSpeaker = currentRound && me ? currentRound.speakerId === me.id : false;
   const isVotingOpen = Boolean(
     room?.status?.phase === 'VOTING' &&
@@ -55,6 +61,7 @@ export function useCloneGame(roomCode: string) {
     Timestamp.now().toMillis() <= currentRound.voteDeadline.toMillis()
   );
 
+  // Initialize - Check if already joined
   useEffect(() => {
     const storedId = localStorage.getItem(`playerId_${roomCode}`);
     if (storedId) {
@@ -62,6 +69,7 @@ export function useCloneGame(roomCode: string) {
     }
   }, [roomCode]);
 
+  // Initialize - Verify room exists
   useEffect(() => {
     const verifyRoom = async () => {
       try {
@@ -71,8 +79,10 @@ export function useCloneGame(roomCode: string) {
 
         const { room: roomData } = await tryJoinRoom(roomCode);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isActive = (roomData as any).active ?? ((roomData as any).status?.phase && (roomData as any).status.phase !== 'END');
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((roomData as any).active === false || !isActive) {
           setError('ROOM_CLOSED');
           setVerifying(false);
@@ -90,6 +100,7 @@ export function useCloneGame(roomCode: string) {
     verifyRoom();
   }, [roomCode]);
 
+  // Subscription - Room
   useEffect(() => {
     if (!roomCode || verifying) return;
 
@@ -103,6 +114,7 @@ export function useCloneGame(roomCode: string) {
     return unsubscribe;
   }, [roomCode, verifying]);
 
+  // Subscription - Players
   useEffect(() => {
     if (!roomCode || verifying) return;
 
@@ -123,6 +135,7 @@ export function useCloneGame(roomCode: string) {
     return unsubscribe;
   }, [roomCode, verifying, myId]);
 
+  // Subscription - Current Round
   useEffect(() => {
     if (!roomCode || !room?.status.currentRoundId) {
       setCurrentRound(null);
@@ -141,11 +154,13 @@ export function useCloneGame(roomCode: string) {
     return unsubscribe;
   }, [roomCode, room?.status?.currentRoundId]);
 
+  // Reset vote state when round changes
   useEffect(() => {
     setHasVoted(false);
     setMyVote(null);
   }, [currentRound?.id]);
 
+  // Load calibration questions
   useEffect(() => {
     const loadQuestions = async () => {
       try {
@@ -160,54 +175,8 @@ export function useCloneGame(roomCode: string) {
     loadQuestions();
   }, []);
 
-  // Preload AI response when the speaker decision screen appears
-  useEffect(() => {
-    const shouldPreload =
-      room?.status?.phase === 'SPEAKER_DECIDE' &&
-      isSpeaker &&
-      me &&
-      currentRound &&
-      currentRound.speakerChoice === null &&
-      !preloadedAiResponse &&
-      !isPreloadingAi;
 
-    if (!shouldPreload) return;
-
-    const preloadAiResponse = async () => {
-      setIsPreloadingAi(true);
-      try {
-        const response = await fetch('/api/generate-redblue-response', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            persona: me.persona,
-            traits: me.traits || [],
-            question: currentRound.questionText || currentRound.question
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setPreloadedAiResponse(data.response);
-        } else {
-          setPreloadedAiResponse("I'd have to think about that one...");
-        }
-      } catch {
-        setPreloadedAiResponse("I'd have to think about that one...");
-      } finally {
-        setIsPreloadingAi(false);
-      }
-    };
-
-    preloadAiResponse();
-  }, [room?.status?.phase, isSpeaker, me, currentRound, preloadedAiResponse, isPreloadingAi]);
-
-  // Reset preloaded response when round changes
-  useEffect(() => {
-    setPreloadedAiResponse(null);
-    setIsPreloadingAi(false);
-  }, [currentRound?.id]);
-
+  // Actions
   const handleJoin = useCallback(async () => {
     if (!name.trim()) {
       setError('Please enter your name');
@@ -293,11 +262,13 @@ export function useCloneGame(roomCode: string) {
     async (choice: 'AI' | 'Self') => {
       if (!me || !currentRound) return;
 
+      // Check if Firebase is initialized
       if (!db) {
         setError('FIREBASE_NOT_INITIALIZED');
         return;
       }
 
+      // Prevent double submission
       if (currentRound.speakerChoice !== null) {
         setError('ALREADY_SET');
         return;
@@ -312,32 +283,27 @@ export function useCloneGame(roomCode: string) {
           speakerChoice: choice
         };
 
+        // If AI choice, generate AI response
         if (choice === 'AI') {
-          // Use preloaded response if available, otherwise generate on the fly
-          if (preloadedAiResponse) {
-            updateData.aiAnswerPrivate = preloadedAiResponse;
-          } else {
-            // Fallback: generate response if preload didn't complete
-            try {
-              const response = await fetch('/api/generate-redblue-response', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  persona: me.persona,
-                  traits: me.traits || [],
-                  question: currentRound.questionText || currentRound.question
-                })
-              });
+          try {
+            const response = await fetch('/api/generate-redblue-response', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                persona: me.persona,
+                traits: me.traits || [],
+                question: currentRound.questionText || currentRound.question
+              })
+            });
 
-              if (response.ok) {
-                const data = await response.json();
-                updateData.aiAnswerPrivate = data.response;
-              } else {
-                updateData.aiAnswerPrivate = "I'd have to think about that one...";
-              }
-            } catch {
+            if (response.ok) {
+              const data = await response.json();
+              updateData.aiAnswerPrivate = data.response;
+            } else {
               updateData.aiAnswerPrivate = "I'd have to think about that one...";
             }
+          } catch (error) {
+            updateData.aiAnswerPrivate = "I'd have to think about that one...";
           }
         }
 
@@ -349,13 +315,14 @@ export function useCloneGame(roomCode: string) {
         setLoading(false);
       }
     },
-    [me, currentRound, roomCode, preloadedAiResponse]
+    [me, currentRound, roomCode]
   );
 
   const handleVote = useCallback(
     async (guess: 'AI' | 'Self') => {
       if (!me || !currentRound) return;
 
+      // Check if Firebase is initialized
       if (!db) {
         setError('FIREBASE_NOT_INITIALIZED');
         return;
@@ -382,21 +349,6 @@ export function useCloneGame(roomCode: string) {
     [me, currentRound, roomCode]
   );
 
-  const handleOpenVoting = useCallback(async () => {
-    if (!currentRound) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      await openVotingFn({ roomCode, roundId: currentRound.id });
-    } catch (err) {
-      setError('PERMISSION_DENIED');
-    } finally {
-      setLoading(false);
-    }
-  }, [roomCode, currentRound]);
-
   const determineScreen = useCallback((): ScreenType => {
     if (verifying) return 'VERIFYING';
     if (error) return 'ERROR';
@@ -416,33 +368,40 @@ export function useCloneGame(roomCode: string) {
   }, [verifying, error, me, room, isSpeaker]);
 
   return {
+    // Data
     room,
     players,
     currentRound,
     me,
+    // UI State
     error,
     loading,
     verifying,
+    // Join
     name,
     setName,
     selectedColor,
     setSelectedColor,
+    // Calibration
     calibrationQuestions,
     calibrationAnswers,
     setCalibrationAnswers,
+    // Speaker Decide
     speakerChoice,
     prepTimeRemaining,
+    // Voting
     hasVoted,
     myVote,
     timeRemaining,
     isVotingOpen,
+    // Derived
     isSpeaker,
-    isPreloadingAi,
+    // Actions
     handleJoin,
     handleSubmitTraits,
     handleSpeakerChoice,
     handleVote,
-    handleOpenVoting,
+    // Screen
     currentScreen: determineScreen()
   };
 }

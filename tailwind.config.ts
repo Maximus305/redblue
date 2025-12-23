@@ -9,6 +9,9 @@ export default {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			'archivo-black': ['var(--font-archivo-black)'],
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

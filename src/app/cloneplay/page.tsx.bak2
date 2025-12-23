@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, useRef } from 'react';
-import CloneGameService, { CloneGameState, ClonePlayer, getTeamColor, getTeamImage } from '@/services/clone/index';
+import CloneGameService, { CloneGameState, ClonePlayer, getTeamColor, getTeamImage } from '@/services/clone';
 import {
   determinePlayerRole,
   validateGameState,
@@ -11,9 +11,11 @@ import {
 import ScreenWrapper from '@/components/clone/ScreenWrapper';
 import LoadingScreen from '@/components/clone/LoadingScreen';
 
+// Type definitions
 type GameState = 'joining' | 'waiting' | 'creating-clone' | 'playing' | 'results' | 'game_over';
 
 const CloneGamePlay: React.FC = () => {
+  // Add styles for placeholder
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -36,8 +38,10 @@ const CloneGamePlay: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   
+  // Clone profile states
   const [cloneInfo, setCloneInfo] = useState<string>('');
 
+  // Gameplay states
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
   const [showAnswerInterface, setShowAnswerInterface] = useState<boolean>(false);
   const [votingChoice, setVotingChoice] = useState<'human' | 'clone' | null>(null);
@@ -48,15 +52,19 @@ const CloneGamePlay: React.FC = () => {
   const lastGeneratedQuestionRef = useRef<string>('');
   const lastRoundNumberRef = useRef<number>(0);
 
+  // Response flow states
   const [responseStep, setResponseStep] = useState<'selection' | 'speak' | 'type' | 'read'>('selection');
   const [typedAnswer, setTypedAnswer] = useState<string>('');
   const [generatingAI, setGeneratingAI] = useState<boolean>(false);
 
+  // Helper function to generate clone response from typed answer
   const generateCloneResponse = async (question: string, humanAnswer: string): Promise<string> => {
     try {
+      // Get player's clone profile
       const currentPlayer = cloneGameData?.players.find(p => p.id === playerId);
       const cloneProfile = currentPlayer?.cloneInfo || '';
 
+      // Call AI API to generate clone response based on profile + human answer
       const response = await fetch('/api/generate-clone-response', {
         method: 'POST',
         headers: {
@@ -75,13 +83,16 @@ const CloneGamePlay: React.FC = () => {
         return data.response;
       }
 
+      // Fallback if API fails
       return `I'd say ${humanAnswer.toLowerCase()}`;
 
     } catch (error) {
+      // Fallback transformation
       return `I'd say ${humanAnswer.toLowerCase()}`;
     }
   };
 
+  // Consistent Layout Template - matches main app exactly
   const renderConsistentScreen = (
     title: string,
     content: React.ReactNode,
@@ -92,10 +103,12 @@ const CloneGamePlay: React.FC = () => {
     </ScreenWrapper>
   );
 
+  // Get current player helper
   const getCurrentPlayer = (): ClonePlayer | undefined => {
     return cloneGameData?.players.find(p => p.id === playerId);
   };
 
+  // Get params from URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const urlRoomId = urlParams.get('roomId');
@@ -105,45 +118,55 @@ const CloneGamePlay: React.FC = () => {
       setRoomId(urlRoomId);
       setPlayerId(urlPlayerId);
       
+      // Get player name from localStorage for logging
       const storedPlayerName = localStorage.getItem(`playerName_${urlRoomId}`) ||
                                localStorage.getItem('agentName') ||
                                'Anonymous';
 
     } else {
+      // Fallback to joining flow if no URL params
       setGameState('joining');
     }
   }, []);
 
+  // Listen to clone game updates
   useEffect(() => {
     if (roomId) {
       const unsubscribeGame = CloneGameService.listenToCloneGame(roomId, (gameData: CloneGameState | null) => {
         if (gameData) {
           setCloneGameData(gameData);
           
+          // Check if player has team assignment - don't modify, just log
           const myPlayer = gameData.players.find(p => p.id === playerId);
           if (myPlayer && !myPlayer.teamId) {
           }
 
+          // Check for invalid questioning state (team questioning their own player)
           if (gameData.currentPlayer && gameData.questioningTeam) {
             const currentPlayer = gameData.players.find(p => p.id === gameData.currentPlayer);
             if (currentPlayer && currentPlayer.teamId === gameData.questioningTeam) {
+              // Force advance to next round to fix the state
               CloneGameService.nextRound(roomId);
               return; // Wait for next update with fixed state
             }
           }
 
+          // Debug all game state issues
           gameData.players.forEach(p => {
           });
 
+          // Determine player role based on game state
           if (playerId) {
             const role = determinePlayerRole(gameData, playerId);
             setPlayerRole(role);
             
+            // Debug logging for voting issues
             if (gameData.gamePhase === 'voting') {
               const amITeamLeader = isTeamLeader(gameData, playerId);
               const totalPlayers = gameData.players.length;
 
 
+              // Show all players and their leadership status with detailed info
               gameData.players.forEach(p => {
                 const isLeader = isTeamLeader(gameData, p.id);
                 const joinedAtType = p.joinedAt ? typeof p.joinedAt : 'undefined';
@@ -152,12 +175,15 @@ const CloneGamePlay: React.FC = () => {
             }
             
             
+            // Validate game state
             const errors = validateGameState(gameData, playerId);
             if (errors.length > 0) {
             }
           }
           
+          // Update game state based on clone game phase
           if (gameData.gamePhase === 'clone_creation') {
+            // Check if current player has already created their clone
             const currentPlayerData = gameData.players.find(p => p.id === playerId);
 
             if (currentPlayerData?.hasCloneProfile) {
@@ -175,30 +201,36 @@ const CloneGamePlay: React.FC = () => {
             setGameState('playing');
           }
 
+          // Reset choice when new question comes, but keep AI response if it's for the same question
           if (gameData.gamePhase === 'waiting_for_response' && gameData.currentPlayer === playerId) {
             setSelectedChoice(null);
             setTypedAnswer('');
             setResponseStep('selection');
+            // Only clear AI response if it's a NEW question
             if (gameData.currentQuestion !== lastGeneratedQuestionRef.current) {
               setAiResponse('');
               setHasSubmittedResponse(false); // Reset for new question
             }
           }
 
+          // Reset voting choice when not in voting phase or when new round starts
           if (gameData.gamePhase !== 'voting') {
             setVotingChoice(null);
           }
 
+          // Reset voting choice when round changes
           if (gameData.roundNumber !== lastRoundNumberRef.current) {
             setVotingChoice(null);
             setHasSubmittedResponse(false);
             lastRoundNumberRef.current = gameData.roundNumber;
           }
 
+          // Check if it's current player's turn to respond
           if (gameData.currentPlayer === playerId &&
               gameData.currentQuestion &&
               gameData.awaitingResponse) {
             setShowAnswerInterface(true);
+            // Reset to selection step when new question arrives
             if (gameData.currentQuestion !== lastGeneratedQuestionRef.current) {
               lastGeneratedQuestionRef.current = gameData.currentQuestion;
               setResponseStep('selection');
@@ -217,15 +249,18 @@ const CloneGamePlay: React.FC = () => {
     }
   }, [roomId, playerId]);
 
+  // Platform tracking and connection monitoring
   useEffect(() => {
     if (!roomId || !playerId) return;
 
+    // Initial status update
     CloneGameService.updatePlayerStatus(roomId, playerId, {
       platform: 'cloneplay',
       lastSeen: new Date().toISOString(),
       isOnline: true
     });
 
+    // Heartbeat to update player online status every 30 seconds
     const heartbeatInterval = setInterval(() => {
       CloneGameService.updatePlayerStatus(roomId, playerId, {
         platform: 'cloneplay',
@@ -234,6 +269,7 @@ const CloneGamePlay: React.FC = () => {
       });
     }, 30000);
 
+    // Cleanup on unmount or before refresh
     const handleBeforeUnload = () => {
       CloneGameService.updatePlayerStatus(roomId, playerId, {
         platform: 'cloneplay',
@@ -248,6 +284,7 @@ const CloneGamePlay: React.FC = () => {
       clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       
+      // Mark player as offline when component unmounts
       CloneGameService.updatePlayerStatus(roomId, playerId, {
         platform: 'cloneplay',
         lastSeen: new Date().toISOString(),
@@ -256,6 +293,8 @@ const CloneGamePlay: React.FC = () => {
     };
   }, [roomId, playerId]);
 
+  // Players join via /[roomId] page now, no need for manual joining
+  // Old generateAIResponse function removed - now using generateCloneResponse with humanAnswer
 
   const handleCreateClone = async (): Promise<void> => {
     
@@ -271,6 +310,7 @@ const CloneGamePlay: React.FC = () => {
       const result = await CloneGameService.saveCloneData(roomId, playerId, cloneInfo.trim());
       
       if (result.success) {
+        // Player has successfully created their clone, move to waiting
         setGameState('waiting');
       } else {
         setError(result.message || 'Failed to create clone profile');
@@ -311,6 +351,7 @@ const CloneGamePlay: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
+      // Submit response based on the choice
       const humanAnswerToSubmit = finalChoice === 'clone' ? typedAnswer : '';
       const aiResponseToSubmit = finalChoice === 'clone' ? aiResponse : '';
 
@@ -324,6 +365,7 @@ const CloneGamePlay: React.FC = () => {
       setShowAnswerInterface(false);
       setResponseStep('selection');
       setHasSubmittedResponse(true); // Mark as submitted immediately
+      // Don't clear selectedChoice, humanAnswer, or aiResponse - keep them for the same question
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to submit response');
     } finally {
@@ -352,6 +394,7 @@ const CloneGamePlay: React.FC = () => {
     }
   };
 
+  // This screen should never show now since we get roomId from URL
   const renderJoinScreen = (): React.ReactElement => (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -420,7 +463,7 @@ const CloneGamePlay: React.FC = () => {
         }}>Please join the game by scanning the QR code from the host&apos;s device.</p>
         
         <button
-          onClick={() => window.location.href = '/rooms'}
+          onClick={() => window.location.href = '/'}
           style={{
             backgroundColor: '#0045FF',
             paddingTop: '15px',
@@ -541,15 +584,18 @@ const CloneGamePlay: React.FC = () => {
     const wasCorrect = roundResult?.correct || false;
     const usedClone = cloneGameData.usedClone;
 
+    // Determine if current player's team was the one guessing
     const myTeam = currentPlayer?.teamId;
     const questioningTeam = cloneGameData.questioningTeam;
     const wasMyTeamGuessing = myTeam === questioningTeam;
 
+    // Message options for different scenarios
     const myTeamCorrectMessages = ['NICE JOB!', 'NAILED IT!', 'SPOT ON!', 'CRUSHED IT!', 'PERFECT!'];
     const myTeamWrongMessages = ['WAY OFF!', 'MISSED IT!', 'NOT EVEN CLOSE!', 'SWING AND A MISS!', 'BETTER LUCK NEXT TIME!'];
     const otherTeamCorrectMessages = ['THEY GOT YOU!', 'CAUGHT!', 'THEY NAILED IT!', 'BUSTED!', 'THEY SAW THROUGH IT!'];
     const otherTeamWrongMessages = ['THEY\'RE WAY OFF!', 'THEY MISSED!', 'FOOLED THEM!', 'THEY FELL FOR IT!', 'GOT AWAY WITH IT!'];
 
+    // Select random message based on scenario
     let resultMessage = '';
     if (wasMyTeamGuessing) {
       if (wasCorrect) {
@@ -961,6 +1007,7 @@ const CloneGamePlay: React.FC = () => {
         {playerRole === 'RESPONDER' && cloneGameData && !showAnswerInterface && (
           <>
             {cloneGameData.currentQuestion && !cloneGameData.playerResponse && !hasSubmittedResponse ? (
+              // Question asked, haven't responded yet
               <ScreenWrapper
                 title="YOUR TURN"
                 bottomButton={{
@@ -1027,6 +1074,7 @@ const CloneGamePlay: React.FC = () => {
                 </p>
               </ScreenWrapper>
             ) : (
+              // Waiting for question OR already responded - show loading screen
               <LoadingScreen
                 teamId={getCurrentPlayer()?.teamId}
                 roundNumber={cloneGameData.roundNumber}

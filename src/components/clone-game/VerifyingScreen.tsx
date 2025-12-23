@@ -1,26 +1,44 @@
 import React from 'react';
-import { colors, typography } from '@/styles/clone-theme';
 
 export function VerifyingScreen() {
   return (
     <div
       className="min-h-screen flex items-center justify-center"
-      style={{ backgroundColor: '#F9FAFB' }}
+      style={{ backgroundColor: '#FFFFFF' }}
     >
       <div className="text-center">
-        <div
-          className="animate-spin rounded-full h-16 w-16 border-b-4 mx-auto mb-6"
-          style={{ borderColor: colors.primaryBlue }}
-        />
+        <style>
+          {`
+            @keyframes bounce {
+              0%, 80%, 100% { transform: scale(0); }
+              40% { transform: scale(1); }
+            }
+          `}
+        </style>
+        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '32px' }}>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#0000FF',
+                borderRadius: '50%',
+                animation: 'bounce 1.4s infinite ease-in-out both',
+                animationDelay: `${i * 0.16}s`,
+              }}
+            />
+          ))}
+        </div>
         <p
-          className="text-2xl font-semibold"
           style={{
-            ...typography.medium,
-            color: colors.textPrimary,
-            fontFamily: typography.fontFamily,
+            fontSize: '24px',
+            fontWeight: 600,
+            color: '#0000FF',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
-          Verifying room...
+          Loading...
         </p>
       </div>
     </div>

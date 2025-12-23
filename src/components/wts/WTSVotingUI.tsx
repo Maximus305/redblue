@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Check } from '@phosphor-icons/react';
+import { DecryptedText } from '@/components/ui/DecryptedText';
 
 interface Player {
   id: string;
@@ -36,7 +37,7 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
   return (
     <div
       className="min-h-screen flex items-center justify-center p-6"
-      style={{ backgroundColor: '#FDD804' }}
+      style={{ backgroundColor: '#F9FAFB' }}
     >
       <div className="w-full max-w-md">
         {!hasVoted ? (
@@ -69,11 +70,11 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                   fontSize: '48px',
                   fontWeight: 900,
                   color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontFamily: 'monospace',
                   marginBottom: '8px',
                 }}
               >
-                WHO IS THE SPY?
+                <DecryptedText text="WHO IS THE SPY?" speed={40} />
               </h1>
               <p
                 className="text-center"
@@ -81,10 +82,10 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                   fontSize: '18px',
                   fontWeight: 600,
                   color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontFamily: 'monospace',
                 }}
               >
-                Select a player to vote
+                <DecryptedText text="Select a player to vote" speed={30} />
               </p>
             </div>
 
@@ -98,7 +99,7 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                     onClick={() => handlePlayerClick(player.id)}
                     className="w-full p-6 transition-all"
                     style={{
-                      backgroundColor: isSelected ? '#FDD804' : '#000000',
+                      backgroundColor: isSelected ? '#FFFFFF' : '#000000',
                       border: isSelected ? '3px solid #000000' : 'none',
                       borderRadius: '20px',
                       cursor: 'pointer',
@@ -111,7 +112,7 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                       style={{
                         fontSize: '28px',
                         fontWeight: 700,
-                        color: isSelected ? '#000000' : '#FDD804',
+                        color: isSelected ? '#000000' : '#FFFFFF',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       }}
                     >
@@ -135,8 +136,8 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
               disabled={!selectedPlayerId}
               className="w-full transition-all"
               style={{
-                backgroundColor: selectedPlayerId ? '#000000' : '#666666',
-                color: '#FDD804',
+                backgroundColor: selectedPlayerId ? '#000000' : '#E5E7EB',
+                color: selectedPlayerId ? '#FFFFFF' : '#000000',
                 border: 'none',
                 borderRadius: '100px',
                 fontSize: '24px',
@@ -144,7 +145,6 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                 cursor: selectedPlayerId ? 'pointer' : 'not-allowed',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 padding: '20px 0',
-                opacity: selectedPlayerId ? 1 : 0.5,
               }}
             >
               SUBMIT VOTE
@@ -180,20 +180,20 @@ export function WTSVotingUI({ players, currentPlayerId, hasVoted = false, onVote
                   fontSize: '72px',
                   fontWeight: 900,
                   color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontFamily: 'monospace',
                 }}
               >
-                VOTED!
+                <DecryptedText text="VOTED!" speed={50} />
               </h1>
               <p
                 style={{
                   fontSize: '24px',
                   fontWeight: 600,
                   color: '#000000',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontFamily: 'monospace',
                 }}
               >
-                Waiting for others...
+                <DecryptedText text="Waiting for others..." speed={30} />
               </p>
             </div>
           </>

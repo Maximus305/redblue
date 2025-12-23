@@ -177,7 +177,7 @@ export default function NameEntryPage() {
             <div className="text-xs mb-4" style={{ color: '#999999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>Room ID: {formattedRoomId || roomId || "Unknown"}</div>
             <div className="flex space-x-4">
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.push('/rooms')}
                 className="px-6 py-2 hover:opacity-90 transition-all"
                 style={{ backgroundColor: '#FDD804', color: '#000000', borderRadius: '100px', border: 'none', fontWeight: 700, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
               >
@@ -198,11 +198,11 @@ export default function NameEntryPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: '#FFFFFF' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: '#F9FAFB' }}>
       <div className={`w-full max-w-md transform transition-all duration-500 ${showContent ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
         {/* Title */}
         <h1
-          className="text-center mb-8"
+          className="text-center mb-2"
           style={{
             fontSize: '48px',
             fontWeight: 400,
@@ -214,115 +214,65 @@ export default function NameEntryPage() {
           WHO&apos;S THE SPY
         </h1>
 
-        {/* Room Code */}
+        {/* Subtitle */}
         <p
           className="text-center mb-8"
           style={{
-            fontSize: '20px',
+            fontSize: '18px',
             fontWeight: 600,
             color: '#000000',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
-          ROOM: {formattedRoomId || roomId}
+          Enter your name to join
         </p>
 
-        {/* Main Content Card */}
-        <div
-          className="p-8 mb-6"
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '20px',
-            border: '3px solid #E5E7EB'
-          }}
-        >
-          <div className="text-center mb-6">
-            <h2
-              className="text-2xl font-bold mb-2"
+        {/* Name Input */}
+        <form onSubmit={handleSubmit}>
+          <div className="mb-6">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full focus:outline-none"
               style={{
+                backgroundColor: '#FFFFFF',
+                border: '2px solid #E5E7EB',
+                borderRadius: '20px',
+                padding: '20px 24px',
+                fontSize: '24px',
+                fontWeight: 600,
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 color: '#000000',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
-            >
-              Enter Your Name
-            </h2>
-            <p
-              className="text-sm"
-              style={{
-                color: '#666666',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}
-            >
-              Required to join the game
-            </p>
+              placeholder="Your name..."
+              aria-label="Agent Name"
+              required
+              autoFocus
+            />
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="mb-6">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-4 text-lg text-center focus:outline-none"
-                style={{
-                  border: '2px solid #E5E5E5',
-                  borderRadius: '12px',
-                  backgroundColor: '#F9FAFB',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  color: '#000000',
-                  fontWeight: 600
-                }}
-                placeholder="Your name"
-                aria-label="Agent Name"
-                required
-                autoFocus
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-              style={{
-                backgroundColor: '#FDD804',
-                color: '#000000',
-                borderRadius: '100px',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '18px',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                padding: '14px 0',
-                opacity: loading || !name.trim() ? 0.5 : 1,
-                cursor: loading || !name.trim() ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Joining...</span>
-                </>
-              ) : (
-                <span>Join Game</span>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Return Home Button */}
-        <button
-          onClick={() => router.push('/')}
-          className="w-full py-3 hover:opacity-90 transition-all"
-          style={{
-            backgroundColor: 'transparent',
-            color: '#000000',
-            border: 'none',
-            fontWeight: 600,
-            fontSize: '16px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          }}
-        >
-          Return Home
-        </button>
+          {/* Join Button */}
+          <button
+            type="submit"
+            disabled={loading || !name.trim()}
+            className="w-full transition-all"
+            style={{
+              backgroundColor: loading || !name.trim() ? '#E5E7EB' : '#FDD804',
+              color: '#000000',
+              border: '2px solid',
+              borderColor: loading || !name.trim() ? '#E5E7EB' : '#FDD804',
+              borderRadius: '100px',
+              fontSize: '24px',
+              fontWeight: 900,
+              cursor: loading || !name.trim() ? 'not-allowed' : 'pointer',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              padding: '20px 0',
+            }}
+          >
+            {loading ? 'JOINING...' : 'JOIN GAME'}
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -74,9 +74,9 @@ export function CalibrationScreen({
                     }}
                     className="w-full text-center transition-all"
                     style={{
-                      backgroundColor: isSelected ? '#0045FF' : '#FFFFFF',
+                      backgroundColor: isSelected ? '#0000FF' : '#FFFFFF',
                       color: isSelected ? '#FFFFFF' : '#000000',
-                      border: isSelected ? '3px solid #0045FF' : '3px solid #E5E7EB',
+                      border: isSelected ? '3px solid #0000FF' : '3px solid #E5E7EB',
                       borderRadius: '16px',
                       padding: '20px 24px',
                       fontSize: '24px',
@@ -121,8 +121,8 @@ export function CalibrationScreen({
               className="w-full transition-all mt-auto"
               style={{
                 height: '80px',
-                backgroundColor: hasAnsweredCurrent && !loading ? '#0045FF' : '#A8A8AD',
-                color: '#FFFFFF',
+                backgroundColor: hasAnsweredCurrent && !loading ? '#0000FF' : '#A8A8AD',
+                color: hasAnsweredCurrent && !loading ? '#FFFFFF' : '#000000',
                 borderRadius: '40px',
                 fontSize: '28px',
                 fontWeight: 600,
