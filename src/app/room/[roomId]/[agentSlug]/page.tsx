@@ -1183,6 +1183,7 @@ const fetchPlayerScores = async (): Promise<void> => {
               border: '2px solid #E5E5E5',
               width: '65%',
               maxWidth: '280px',
+              aspectRatio: '1 / 1',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
