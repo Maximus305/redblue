@@ -1193,7 +1193,7 @@ const fetchPlayerScores = async (): Promise<void> => {
               value={`https://redblue-ten.vercel.app/${roomId}`}
               size={200}
               level="M"
-              style={{ width: '100%', height: '100%' }}
+              style={{ width: '85%', height: '85%' }}
             />
           </div>
 
