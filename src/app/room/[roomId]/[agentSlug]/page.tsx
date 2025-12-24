@@ -1472,10 +1472,10 @@ const fetchPlayerScores = async (): Promise<void> => {
                   }}
                 >
                   <div className="flex justify-between items-center mb-3">
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                       MISSION-{roomId?.slice(0, 4).toUpperCase()}
                     </span>
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                       CLASSIFIED
                     </span>
                   </div>
@@ -1544,10 +1544,10 @@ const fetchPlayerScores = async (): Promise<void> => {
               }}
             >
               <div className="flex justify-between items-center mb-4">
-                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                   ALERT-{Math.floor(Math.random() * 9000 + 1000)}
                 </span>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: '#999', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                   PRIORITY-1
                 </span>
               </div>
