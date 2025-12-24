@@ -42,6 +42,7 @@ export const IMAGE_MAPPINGS: ImageMappingType = {
   'Rubiks': '/images/rubiks.png',
   'Tent': '/images/tent.png',
   'Tire': '/images/tire.png',
+  'Watch': '/images/watch.png',
   'Wrench': '/images/wrench.png'
 };
 
