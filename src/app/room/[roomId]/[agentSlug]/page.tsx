@@ -16,6 +16,7 @@ import { IconForWord } from '@/utils/codeWords';
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from 'qrcode.react';
 import { DecryptedText } from '@/components/ui/DecryptedText';
+import { GlitchyText } from '@/components/ui/GlitchyText';
 
 // Type definitions
 interface AgentPageProps {
@@ -1064,9 +1065,9 @@ const fetchPlayerScores = async (): Promise<void> => {
             className="mb-6"
             style={{
               fontSize: '42px',
-              fontWeight: 400,
+              fontWeight: 700,
               color: '#000000',
-              fontFamily: 'var(--font-barrio)',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               lineHeight: 1.1,
             }}
           >
@@ -1086,7 +1087,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 fontSize: '32px',
                 fontWeight: 900,
                 color: '#FFFFFF',
-                fontFamily: 'monospace',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 marginBottom: '16px',
               }}
             >
@@ -1097,7 +1098,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 fontSize: '18px',
                 fontWeight: 600,
                 color: '#999999',
-                fontFamily: 'monospace',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
               <DecryptedText text="Please wait for the next round to start" speed={30} />
@@ -1154,98 +1155,182 @@ const fetchPlayerScores = async (): Promise<void> => {
   }
 
   if (!error && !gameStarted) {
+    // Random spy/tech strings for decoration
+    const techStrings = [
+      '01001010', '△▽◇○', 'DECRYPT', '>>>_', 'SYS.OK',
+      '##//##', 'NODE:7', 'INIT...', '◉◉◉', 'SCAN',
+    ];
+
     return (
       <div
-        className="min-h-screen flex items-center justify-center p-6"
-        style={{ backgroundColor: '#F9FAFB' }}
+        className="min-h-screen p-6 relative overflow-hidden"
+        style={{ backgroundColor: '#F5F5F5' }}
       >
-        <div className="w-full max-w-md">
-          {/* Title */}
-          <h1
-            className="text-center mb-8"
+        {/* Floating tech decorations */}
+        <div style={{ position: 'absolute', top: '15%', left: '5%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[0]}
+        </div>
+        <div style={{ position: 'absolute', top: '25%', right: '8%', fontSize: '11px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[1]}
+        </div>
+        <div style={{ position: 'absolute', top: '45%', left: '3%', fontSize: '9px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[2]}
+        </div>
+        <div style={{ position: 'absolute', top: '60%', right: '5%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[3]}
+        </div>
+        <div style={{ position: 'absolute', top: '75%', left: '7%', fontSize: '11px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[4]}
+        </div>
+        <div style={{ position: 'absolute', top: '85%', right: '10%', fontSize: '9px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[5]}
+        </div>
+        <div style={{ position: 'absolute', top: '35%', right: '3%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[6]}
+        </div>
+        <div style={{ position: 'absolute', top: '55%', left: '8%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
+          {techStrings[7]}
+        </div>
+
+        {/* Header with title */}
+        <div className="pt-8 pb-6 relative z-10">
+          <p
+            className="text-center mb-1"
             style={{
-              fontSize: '42px',
-              fontWeight: 400,
+              fontSize: '10px',
+              color: '#999999',
+              fontFamily: 'monospace',
+              letterSpacing: '3px',
+            }}
+          >
+            [ CLASSIFIED ]
+          </p>
+          <h1
+            className="text-center"
+            style={{
+              fontSize: '28px',
+              fontWeight: 800,
               color: '#000000',
-              fontFamily: 'var(--font-barrio)',
-              lineHeight: 1.1,
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              letterSpacing: '2px',
             }}
           >
             WHO&apos;S THE SPY
           </h1>
+          <p
+            className="text-center mt-2"
+            style={{
+              fontSize: '11px',
+              color: '#999999',
+              fontFamily: 'monospace',
+              letterSpacing: '2px',
+            }}
+          >
+            AWAITING AGENTS...
+          </p>
+        </div>
 
-          {/* QR Code */}
+        {/* QR Code Section */}
+        <div className="flex justify-center mb-6 relative z-10">
           <div
-            className="mb-6 p-4 mx-auto"
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '16px',
-              border: '2px solid #E5E5E5',
-              width: '65%',
-              maxWidth: '280px',
-              aspectRatio: '1 / 1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              borderRadius: '12px',
+              padding: '16px',
             }}
           >
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={200}
+              size={160}
               level="M"
-              style={{ width: '85%', height: '85%' }}
             />
+            <p
+              className="text-center mt-2"
+              style={{
+                fontSize: '8px',
+                color: '#AAAAAA',
+                fontFamily: 'monospace',
+                letterSpacing: '1px',
+              }}
+            >
+              SCAN TO JOIN
+            </p>
           </div>
-
-          {/* All Players */}
-          {allAgents.map((agent) => {
-            const isMe = agent.id === `${roomId}_${agentSlug}`;
-            return (
-              <div
-                key={agent.id}
-                className="p-2.5 mb-2.5 mx-auto"
-                style={{
-                  backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
-                  border: isMe ? 'none' : '2px solid #E5E5E5',
-                  borderRadius: '9999px',
-                  width: '65%',
-                  maxWidth: '280px',
-                }}
-              >
-                <p
-                  className="text-center"
-                  style={{
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    color: '#000000',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  }}
-                >
-                  {agent.name}
-                </p>
-              </div>
-            );
-          })}
         </div>
 
-        <style jsx>{`
-          @keyframes pulse {
-            0%, 100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.3;
-            }
-          }
-          @keyframes breathe {
-            0%, 100% {
-              transform: scale(1);
-            }
-            50% {
-              transform: scale(1.02);
-            }
-          }
-        `}</style>
+        {/* Players Section */}
+        <div className="max-w-sm mx-auto relative z-10">
+          <div
+            className="flex items-center justify-center mb-4"
+            style={{ gap: '8px' }}
+          >
+            <span style={{ fontSize: '10px', color: '#CCCCCC', fontFamily: 'monospace' }}>——</span>
+            <span
+              style={{
+                fontSize: '11px',
+                color: '#888888',
+                fontFamily: 'monospace',
+                letterSpacing: '2px',
+              }}
+            >
+              AGENTS [{allAgents.length}]
+            </span>
+            <span style={{ fontSize: '10px', color: '#CCCCCC', fontFamily: 'monospace' }}>——</span>
+          </div>
+
+          <div className="space-y-2">
+            {allAgents.map((agent, index) => {
+              const isMe = agent.id === `${roomId}_${agentSlug}`;
+              return (
+                <div
+                  key={agent.id}
+                  style={{
+                    backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      color: isMe ? '#8B7355' : '#CCCCCC',
+                      fontFamily: 'monospace',
+                    }}
+                  >
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      color: '#000000',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                      flex: 1,
+                    }}
+                  >
+                    {agent.name}
+                  </span>
+                  {isMe && (
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        color: '#6B5B00',
+                        fontFamily: 'monospace',
+                        letterSpacing: '1px',
+                      }}
+                    >
+                      [YOU]
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1273,7 +1358,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 fontSize: 'clamp(40px, 10vw, 64px)',
                 fontWeight: 900,
                 color: '#000000',
-                fontFamily: 'monospace',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 letterSpacing: '2px',
               }}
             >
@@ -1294,20 +1379,19 @@ const fetchPlayerScores = async (): Promise<void> => {
               {/* Empty space at top */}
               <div></div>
 
-              {/* SPY - centered and huge */}
+              {/* SPY - centered and huge with glitchy fonts */}
               <h1
                 style={{
-                  fontSize: 'clamp(100px, 25vw, 180px)',
-                  fontWeight: 900,
+                  fontSize: 'clamp(140px, 35vw, 240px)',
+                  fontWeight: 400,
                   color: '#DC2626',
-                  fontFamily: 'monospace',
                   letterSpacing: '8px',
                   lineHeight: 1,
                   position: 'relative',
                   zIndex: 1,
                 }}
               >
-                <DecryptedText text="SPY" speed={80} />
+                <GlitchyText text="SPY" speed={100} />
               </h1>
 
               {/* REVEAL YOURSELF and points - at bottom */}
@@ -1318,7 +1402,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                     fontSize: '32px',
                     fontWeight: 900,
                     color: '#FFFFFF',
-                    fontFamily: 'monospace',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     letterSpacing: '4px',
                     lineHeight: 1.1,
                   }}
@@ -1333,7 +1417,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                       fontSize: '20px',
                       fontWeight: 900,
                       color: '#FFFFFF',
-                      fontFamily: 'monospace',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       letterSpacing: '2px',
                     }}
                   >
@@ -1350,7 +1434,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                   fontSize: 'clamp(32px, 8vw, 56px)',
                   fontWeight: 900,
                   color: '#000000',
-                  fontFamily: 'monospace',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   letterSpacing: '2px',
                 }}
               >
@@ -1368,7 +1452,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                 fontSize: 'clamp(32px, 8vw, 48px)',
                 fontWeight: 900,
                 color: '#000000',
-                fontFamily: 'monospace',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 letterSpacing: '2px',
                 lineHeight: 1.2,
               }}
@@ -1391,7 +1475,7 @@ const fetchPlayerScores = async (): Promise<void> => {
             fontSize: 'clamp(28px, 7vw, 44px)',
             fontWeight: 900,
             color: '#000000',
-            fontFamily: 'monospace',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             lineHeight: 1.1,
           }}
         >
@@ -1633,7 +1717,7 @@ const fetchPlayerScores = async (): Promise<void> => {
   <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div className="bg-white rounded-lg shadow-xl w-full max-w-md transform transition-all">
       <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-lg font-mono font-bold">PLAYER SCORES</h3>
+        <h3 className="text-lg font-bold">PLAYER SCORES</h3>
         <button 
           onClick={() => setShowScores(false)}
           className="text-gray-500 hover:text-gray-700"
@@ -1665,20 +1749,20 @@ const fetchPlayerScores = async (): Promise<void> => {
                 <div className="font-medium">
                   {player.agentName}
                   {player.isSwiftPlayer && (
-                    <span className="ml-2 text-xs text-blue-600 font-mono">(iOS)</span>
+                    <span className="ml-2 text-xs text-blue-600">(iOS)</span>
                   )}
                   {(isSpymaster.isRed && player.agentId === agentSlug) && (
-                    <span className="ml-2 text-xs text-red-600 font-mono">RED SPYMASTER</span>
+                    <span className="ml-2 text-xs text-red-600">RED SPYMASTER</span>
                   )}
                   {(isSpymaster.isBlue && player.agentId === agentSlug) && (
-                    <span className="ml-2 text-xs text-blue-600 font-mono">BLUE SPYMASTER</span>
+                    <span className="ml-2 text-xs text-blue-600">BLUE SPYMASTER</span>
                   )}
                   {(isSpy && player.agentId === agentSlug) && (
-                    <span className="ml-2 text-xs text-red-600 font-mono">SPY</span>
+                    <span className="ml-2 text-xs text-red-600">SPY</span>
                   )}
                 </div>
                 
-                <div className={`px-3 py-1 rounded-full font-mono text-center ${
+                <div className={`px-3 py-1 rounded-full text-center ${
                   player.isSwiftPlayer ? 'bg-blue-100' : 'bg-gray-200'
                 }`}>
                   {player.score}
