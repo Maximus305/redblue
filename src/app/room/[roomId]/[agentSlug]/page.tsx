@@ -1155,7 +1155,7 @@ const fetchPlayerScores = async (): Promise<void> => {
   }
 
   if (!error && !gameStarted) {
-    // Random spy/tech strings for decoration
+    // Spy/tech strings for decoration
     const techStrings = [
       '01001010', '△▽◇○', 'DECRYPT', '>>>_', 'SYS.OK',
       '##//##', 'NODE:7', 'INIT...', '◉◉◉', 'SCAN',
