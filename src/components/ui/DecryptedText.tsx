@@ -137,7 +137,7 @@ export function DecryptedText({
     <span
       ref={ref}
       className={className}
-      style={{ ...style, fontFamily: 'monospace' }}
+      style={{ ...style }}
       onMouseEnter={handleMouseEnter}
     >
       {displayText || text}
