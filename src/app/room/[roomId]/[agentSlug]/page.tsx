@@ -1155,83 +1155,26 @@ const fetchPlayerScores = async (): Promise<void> => {
   }
 
   if (!error && !gameStarted) {
-    // Spy/tech strings for decoration
-    const techStrings = [
-      '01001010', '△▽◇○', 'DECRYPT', '>>>_', 'SYS.OK',
-      '##//##', 'NODE:7', 'INIT...', '◉◉◉', 'SCAN',
-    ];
-
     return (
       <div
-        className="min-h-screen p-6 relative overflow-hidden"
+        className="min-h-screen p-6"
         style={{ backgroundColor: '#F5F5F5' }}
       >
-        {/* Floating tech decorations */}
-        <div style={{ position: 'absolute', top: '15%', left: '5%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[0]}
-        </div>
-        <div style={{ position: 'absolute', top: '25%', right: '8%', fontSize: '11px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[1]}
-        </div>
-        <div style={{ position: 'absolute', top: '45%', left: '3%', fontSize: '9px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[2]}
-        </div>
-        <div style={{ position: 'absolute', top: '60%', right: '5%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[3]}
-        </div>
-        <div style={{ position: 'absolute', top: '75%', left: '7%', fontSize: '11px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[4]}
-        </div>
-        <div style={{ position: 'absolute', top: '85%', right: '10%', fontSize: '9px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[5]}
-        </div>
-        <div style={{ position: 'absolute', top: '35%', right: '3%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[6]}
-        </div>
-        <div style={{ position: 'absolute', top: '55%', left: '8%', fontSize: '10px', color: '#D0D0D0', fontFamily: 'monospace' }}>
-          {techStrings[7]}
-        </div>
+        {/* Title */}
+        <h1
+          className="text-center pt-8 mb-6"
+          style={{
+            fontSize: '24px',
+            fontWeight: 700,
+            color: '#000000',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          }}
+        >
+          WHO&apos;S THE SPY
+        </h1>
 
-        {/* Header with title */}
-        <div className="pt-8 pb-6 relative z-10">
-          <p
-            className="text-center mb-1"
-            style={{
-              fontSize: '10px',
-              color: '#999999',
-              fontFamily: 'monospace',
-              letterSpacing: '3px',
-            }}
-          >
-            [ CLASSIFIED ]
-          </p>
-          <h1
-            className="text-center"
-            style={{
-              fontSize: '28px',
-              fontWeight: 800,
-              color: '#000000',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              letterSpacing: '2px',
-            }}
-          >
-            WHO&apos;S THE SPY
-          </h1>
-          <p
-            className="text-center mt-2"
-            style={{
-              fontSize: '11px',
-              color: '#999999',
-              fontFamily: 'monospace',
-              letterSpacing: '2px',
-            }}
-          >
-            AWAITING AGENTS...
-          </p>
-        </div>
-
-        {/* QR Code Section */}
-        <div className="flex justify-center mb-6 relative z-10">
+        {/* QR Code */}
+        <div className="flex justify-center mb-6">
           <div
             style={{
               backgroundColor: '#FFFFFF',
@@ -1241,95 +1184,38 @@ const fetchPlayerScores = async (): Promise<void> => {
           >
             <QRCodeSVG
               value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={160}
+              size={140}
               level="M"
             />
-            <p
-              className="text-center mt-2"
-              style={{
-                fontSize: '8px',
-                color: '#AAAAAA',
-                fontFamily: 'monospace',
-                letterSpacing: '1px',
-              }}
-            >
-              SCAN TO JOIN
-            </p>
           </div>
         </div>
 
-        {/* Players Section */}
-        <div className="max-w-sm mx-auto relative z-10">
-          <div
-            className="flex items-center justify-center mb-4"
-            style={{ gap: '8px' }}
-          >
-            <span style={{ fontSize: '10px', color: '#CCCCCC', fontFamily: 'monospace' }}>——</span>
-            <span
-              style={{
-                fontSize: '11px',
-                color: '#888888',
-                fontFamily: 'monospace',
-                letterSpacing: '2px',
-              }}
-            >
-              AGENTS [{allAgents.length}]
-            </span>
-            <span style={{ fontSize: '10px', color: '#CCCCCC', fontFamily: 'monospace' }}>——</span>
-          </div>
-
-          <div className="space-y-2">
-            {allAgents.map((agent, index) => {
-              const isMe = agent.id === `${roomId}_${agentSlug}`;
-              return (
-                <div
-                  key={agent.id}
+        {/* Players */}
+        <div className="max-w-xs mx-auto space-y-2">
+          {allAgents.map((agent) => {
+            const isMe = agent.id === `${roomId}_${agentSlug}`;
+            return (
+              <div
+                key={agent.id}
+                style={{
+                  backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                }}
+              >
+                <span
                   style={{
-                    backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
-                    borderRadius: '8px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#000000',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      color: isMe ? '#8B7355' : '#CCCCCC',
-                      fontFamily: 'monospace',
-                    }}
-                  >
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      color: '#000000',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                      flex: 1,
-                    }}
-                  >
-                    {agent.name}
-                  </span>
-                  {isMe && (
-                    <span
-                      style={{
-                        fontSize: '9px',
-                        fontWeight: 700,
-                        color: '#6B5B00',
-                        fontFamily: 'monospace',
-                        letterSpacing: '1px',
-                      }}
-                    >
-                      [YOU]
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  {agent.name}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
