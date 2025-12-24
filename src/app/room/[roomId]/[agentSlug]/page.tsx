@@ -1157,15 +1157,15 @@ const fetchPlayerScores = async (): Promise<void> => {
   if (!error && !gameStarted) {
     return (
       <div
-        className="min-h-screen p-6"
+        className="min-h-screen flex flex-col items-center justify-center p-6"
         style={{ backgroundColor: '#F5F5F5' }}
       >
         {/* Title */}
         <h1
-          className="text-center pt-8 mb-6"
+          className="text-center mb-8"
           style={{
-            fontSize: '24px',
-            fontWeight: 700,
+            fontSize: '36px',
+            fontWeight: 800,
             color: '#000000',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
@@ -1174,38 +1174,38 @@ const fetchPlayerScores = async (): Promise<void> => {
         </h1>
 
         {/* QR Code */}
-        <div className="flex justify-center mb-6">
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '12px',
-              padding: '16px',
-            }}
-          >
-            <QRCodeSVG
-              value={`https://redblue-ten.vercel.app/${roomId}`}
-              size={140}
-              level="M"
-            />
-          </div>
+        <div
+          className="mb-8"
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '24px',
+            padding: '24px',
+          }}
+        >
+          <QRCodeSVG
+            value={`https://redblue-ten.vercel.app/${roomId}`}
+            size={220}
+            level="M"
+          />
         </div>
 
         {/* Players */}
-        <div className="max-w-xs mx-auto space-y-2">
+        <div className="w-full max-w-sm space-y-3">
           {allAgents.map((agent) => {
             const isMe = agent.id === `${roomId}_${agentSlug}`;
             return (
               <div
                 key={agent.id}
+                className="text-center"
                 style={{
                   backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  padding: '16px 24px',
                 }}
               >
                 <span
                   style={{
-                    fontSize: '15px',
+                    fontSize: '18px',
                     fontWeight: 600,
                     color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
