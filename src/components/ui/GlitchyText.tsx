@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 interface GlitchyTextProps {
   text: string;
@@ -23,33 +23,43 @@ const FONTS: { family: string; scale: number }[] = [
   { family: 'Brush Script MT, cursive', scale: 0.9 },
 ];
 
-export function GlitchyText({ text, className = '', style = {}, speed = 100 }: GlitchyTextProps) {
-  const [letterFontIndices, setLetterFontIndices] = useState<number[]>([]);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+export function GlitchyText({ text, className = '', style = {}, speed = 150 }: GlitchyTextProps) {
+  const [letterFontIndices, setLetterFontIndices] = useState<number[]>(() =>
+    text.split('').map(() => Math.floor(Math.random() * FONTS.length))
+  );
+  const rafRef = useRef<number | null>(null);
+  const lastUpdateRef = useRef<number>(0);
 
-  useEffect(() => {
-    // Initialize with random font indices for each letter
-    const initialIndices = text.split('').map(() =>
-      Math.floor(Math.random() * FONTS.length)
-    );
-    setLetterFontIndices(initialIndices);
-
-    // Start the glitch animation
-    intervalRef.current = setInterval(() => {
-      setLetterFontIndices(prev =>
-        prev.map(() => Math.floor(Math.random() * FONTS.length))
+  const animate = useCallback((timestamp: number) => {
+    if (timestamp - lastUpdateRef.current >= speed) {
+      setLetterFontIndices(
+        text.split('').map(() => Math.floor(Math.random() * FONTS.length))
       );
-    }, speed);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
+      lastUpdateRef.current = timestamp;
+    }
+    rafRef.current = requestAnimationFrame(animate);
   }, [text, speed]);
 
+  useEffect(() => {
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [animate]);
+
   return (
-    <span className={className} style={{ ...style, display: 'inline-flex', alignItems: 'center' }}>
+    <span
+      className={className}
+      style={{
+        ...style,
+        display: 'inline-flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+      }}
+    >
       {text.split('').map((letter, index) => {
         const fontConfig = FONTS[letterFontIndices[index]] || FONTS[0];
         return (
@@ -61,6 +71,8 @@ export function GlitchyText({ text, className = '', style = {}, speed = 100 }: G
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: `${fontConfig.scale}em`,
+              width: '0.8em',
+              overflow: 'hidden',
             }}
           >
             {letter}

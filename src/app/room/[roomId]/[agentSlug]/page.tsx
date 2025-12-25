@@ -1162,12 +1162,13 @@ const fetchPlayerScores = async (): Promise<void> => {
       >
         {/* Title */}
         <h1
-          className="text-center mb-8"
+          className="text-center mb-10"
           style={{
-            fontSize: '36px',
-            fontWeight: 800,
+            fontSize: '32px',
+            fontWeight: 900,
             color: '#000000',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            letterSpacing: '-0.5px',
           }}
         >
           WHO&apos;S THE SPY
@@ -1175,22 +1176,22 @@ const fetchPlayerScores = async (): Promise<void> => {
 
         {/* QR Code */}
         <div
-          className="mb-8"
+          className="mb-10"
           style={{
             backgroundColor: '#FFFFFF',
-            borderRadius: '24px',
-            padding: '24px',
+            borderRadius: '20px',
+            padding: '20px',
           }}
         >
           <QRCodeSVG
             value={`https://redblue-ten.vercel.app/${roomId}`}
-            size={220}
+            size={200}
             level="M"
           />
         </div>
 
         {/* Players */}
-        <div className="w-full max-w-sm space-y-3">
+        <div className="w-full max-w-xs space-y-3">
           {allAgents.map((agent) => {
             const isMe = agent.id === `${roomId}_${agentSlug}`;
             return (
@@ -1198,15 +1199,15 @@ const fetchPlayerScores = async (): Promise<void> => {
                 key={agent.id}
                 className="text-center"
                 style={{
-                  backgroundColor: isMe ? '#FFD93D' : '#FFFFFF',
-                  borderRadius: '12px',
-                  padding: '16px 24px',
+                  backgroundColor: isMe ? '#FACC15' : '#FFFFFF',
+                  borderRadius: '50px',
+                  padding: '14px 24px',
                 }}
               >
                 <span
                   style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
+                    fontSize: '16px',
+                    fontWeight: 700,
                     color: '#000000',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}
@@ -1293,7 +1294,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                     lineHeight: 1.1,
                   }}
                 >
-                  <DecryptedText text="Reveal yourself." speed={40} />
+                  Reveal yourself.
                 </h2>
 
                 {/* Points display - only show if spy got the point */}
@@ -1307,7 +1308,7 @@ const fetchPlayerScores = async (): Promise<void> => {
                       letterSpacing: '2px',
                     }}
                   >
-                    <DecryptedText text="+1 point for spy." speed={30} />
+                    +1 point for spy.
                   </h3>
                 )}
               </div>
